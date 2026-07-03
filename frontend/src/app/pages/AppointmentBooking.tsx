@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, HeartPulse, CheckCircle2, CalendarCheck2 } from "lucide-react";
-import { DOCTORS } from "../data/doctors";
+import { doctorsService, doctorFullName, type Doctor, type AvailabilitySlot } from "../services/doctors";
+import { appointmentsService } from "../services/appointments";
 import AvailabilityCalendar from "../components/AvailabilityCalendar";
 import TimeSlotPicker from "../components/TimeSlotPicker";
 import BookingSummary from "../components/BookingSummary";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 
 type Step = 1 | 2 | 3;
+type SelectedSlot = { time: string; slotMinutes: number };
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Choose date",
@@ -14,33 +17,69 @@ const STEP_LABELS: Record<Step, string> = {
   3: "Confirm booking",
 };
 
+const AVATAR_FALLBACK = "https://api.dicebear.com/7.x/initials/svg?seed=";
+
+/** Combines a Date (day only) with a "9:30 AM" string into a real Date */
+function combineDateAndTime(date: Date, time: string): Date {
+  const match = time.match(/(\d+):(\d+)\s?(AM|PM)/i);
+  if (!match) return date;
+  let [, hStr, mStr, period] = match;
+  let hour = parseInt(hStr, 10);
+  const minute = parseInt(mStr, 10);
+  if (period.toUpperCase() === "PM" && hour !== 12) hour += 12;
+  if (period.toUpperCase() === "AM" && hour === 12) hour = 0;
+  const combined = new Date(date);
+  combined.setHours(hour, minute, 0, 0);
+  return combined;
+}
+
 export default function AppointmentBooking() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const doctor = DOCTORS.find(d => d.id === id);
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
+  const [loadingDoctor, setLoadingDoctor] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const [step, setStep] = useState<Step>(1);
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
     const d = searchParams.get("date");
     return d ? new Date(d) : null;
   });
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [appointmentType, setAppointmentType] = useState<"in-person" | "video">(
-    doctor?.appointmentTypes[0] ?? "in-person"
-  );
+  const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null);
+  const [appointmentType, setAppointmentType] = useState<"in-person" | "video">("in-person");
   const [reason, setReason] = useState("");
-  const [insurance, setInsurance] = useState("");
   const [loading, setLoading] = useState(false);
+  const [bookingError, setBookingError] = useState("");
   const [confirmed, setConfirmed] = useState(false);
 
-  // If date was pre-selected, skip to step 2
+  useEffect(() => {
+    if (!id) return;
+    setLoadingDoctor(true);
+    Promise.all([doctorsService.getById(id), doctorsService.getAvailability(id)])
+      .then(([doc, slots]) => {
+        setDoctor(doc);
+        setAvailability(slots);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoadingDoctor(false));
+  }, [id]);
+
   useEffect(() => {
     if (selectedDate) setStep(2);
   }, []);
 
-  if (!doctor) {
+  if (loadingDoctor) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center font-['Inter',sans-serif]">
+        <LoadingSkeleton className="h-32 w-80 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (notFound || !doctor) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center font-['Inter',sans-serif]">
         <div className="text-center">
@@ -52,22 +91,38 @@ export default function AppointmentBooking() {
     );
   }
 
+  const availableWeekdays = Array.from(new Set(availability.map(s => s.day_of_week)));
+  const name = doctorFullName(doctor);
+  const avatarSrc = doctor.avatar_url || `${AVATAR_FALLBACK}${encodeURIComponent(name)}`;
+
   function handleDateSelect(date: Date) {
     setSelectedDate(date);
     setSelectedSlot(null);
     setStep(2);
   }
 
-  function handleSlotSelect(slot: string) {
-    setSelectedSlot(slot);
-  }
-
-  function handleConfirm() {
+  async function handleConfirm() {
+    if (!selectedDate || !selectedSlot || !doctor) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setBookingError("");
+    try {
+      await appointmentsService.book({
+        doctor_id: doctor.id,
+        scheduled_at: combineDateAndTime(selectedDate, selectedSlot.time).toISOString(),
+        duration_min: selectedSlot.slotMinutes,
+        type: appointmentType === "video" ? "VIDEO" : "IN_PERSON",
+        reason_for_visit: reason || undefined,
+      });
       setConfirmed(true);
-    }, 1200);
+    } catch (err: any) {
+      setBookingError(
+        err.status === 409
+          ? "This slot was just booked by someone else. Please pick a different time."
+          : (err.message || "Failed to book appointment. Please try again.")
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (confirmed && selectedDate && selectedSlot) {
@@ -79,33 +134,31 @@ export default function AppointmentBooking() {
           </div>
           <h1 className="font-['Fraunces',serif] text-3xl font-semibold text-foreground mb-2">You're confirmed!</h1>
           <p className="text-muted-foreground mb-8 text-sm leading-relaxed max-w-sm mx-auto">
-            Your appointment with <span className="text-foreground font-medium">{doctor.name}</span> on{" "}
+            Your appointment with <span className="text-foreground font-medium">{name}</span> on{" "}
             <span className="text-foreground font-medium">
               {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             </span>{" "}
-            at <span className="text-foreground font-medium">{selectedSlot}</span> has been confirmed.
+            at <span className="text-foreground font-medium">{selectedSlot.time}</span> has been requested.
           </p>
 
           <div className="bg-card rounded-2xl border border-border p-5 text-left mb-6 space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex-shrink-0">
-                <img src={`https://images.unsplash.com/${doctor.avatar}?w=48&h=48&fit=crop&auto=format`} alt={doctor.name} className="w-full h-full object-cover" />
+                <img src={avatarSrc} alt={name} className="w-full h-full object-cover" />
               </div>
               <div>
-                <p className="font-medium text-foreground">{doctor.name}</p>
+                <p className="font-medium text-foreground">{name}</p>
                 <p className="text-sm text-accent">{doctor.specialty}</p>
               </div>
             </div>
             <div className="border-t border-border pt-3 grid grid-cols-2 gap-2 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground">Date</p>
-                <p className="font-medium text-foreground">
-                  {selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
+                <p className="font-medium text-foreground">{selectedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Time</p>
-                <p className="font-medium text-foreground">{selectedSlot}</p>
+                <p className="font-medium text-foreground">{selectedSlot.time}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Type</p>
@@ -113,7 +166,7 @@ export default function AppointmentBooking() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Fee</p>
-                <p className="font-medium text-foreground">${doctor.consultationFee}</p>
+                <p className="font-medium text-foreground">${doctor.consultation_fee}</p>
               </div>
             </div>
           </div>
@@ -133,7 +186,6 @@ export default function AppointmentBooking() {
 
   return (
     <div className="min-h-screen bg-background font-['Inter',sans-serif]">
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-card border-b border-border px-4 sm:px-6 h-16 flex items-center gap-4">
         <button
           onClick={() => step > 1 ? setStep((step - 1) as Step) : navigate(`/doctor/${doctor.id}`)}
@@ -149,7 +201,6 @@ export default function AppointmentBooking() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
-        {/* Progress steps */}
         <div className="flex items-center gap-2 mb-8">
           {([1, 2, 3] as Step[]).map((s, i) => (
             <div key={s} className="flex items-center gap-2">
@@ -166,28 +217,30 @@ export default function AppointmentBooking() {
           ))}
         </div>
 
-        {/* Doctor mini header */}
         <div className="flex items-center gap-3 mb-6 p-4 bg-card rounded-xl border border-border">
           <div className="w-12 h-12 rounded-xl overflow-hidden bg-muted flex-shrink-0">
-            <img src={`https://images.unsplash.com/${doctor.avatar}?w=48&h=48&fit=crop&auto=format`} alt={doctor.name} className="w-full h-full object-cover" />
+            <img src={avatarSrc} alt={name} className="w-full h-full object-cover" />
           </div>
           <div>
-            <p className="font-medium text-foreground">{doctor.name}</p>
-            <p className="text-sm text-accent">{doctor.specialty} · ${doctor.consultationFee}</p>
+            <p className="font-medium text-foreground">{name}</p>
+            <p className="text-sm text-accent">{doctor.specialty} · ${doctor.consultation_fee}</p>
           </div>
           <button onClick={() => navigate(`/doctor/${doctor.id}`)} className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors">Change</button>
         </div>
 
-        {/* Step content */}
         <div className="bg-transparent">
           {step === 1 && (
             <div className="space-y-4">
               <div>
                 <h2 className="font-['Fraunces',serif] text-2xl font-semibold text-foreground mb-1">Choose a date</h2>
-                <p className="text-sm text-muted-foreground">Dates with availability are marked with a teal dot.</p>
+                <p className="text-sm text-muted-foreground">
+                  {availableWeekdays.length === 0
+                    ? "This doctor hasn't set their availability yet."
+                    : "Dates with availability are marked with a teal dot."}
+                </p>
               </div>
               <AvailabilityCalendar
-                availableDays={doctor.availableDays}
+                availableWeekdays={availableWeekdays}
                 selectedDate={selectedDate}
                 onSelect={handleDateSelect}
               />
@@ -198,16 +251,16 @@ export default function AppointmentBooking() {
             <div className="space-y-4">
               <div>
                 <h2 className="font-['Fraunces',serif] text-2xl font-semibold text-foreground mb-1">Choose a time</h2>
-                <p className="text-sm text-muted-foreground">All times shown in Pacific Time (PT).</p>
+                <p className="text-sm text-muted-foreground">All times shown in your local time.</p>
               </div>
               <div className="bg-card rounded-xl border border-border p-5">
                 <TimeSlotPicker
                   date={selectedDate}
+                  slots={availability}
                   appointmentType={appointmentType}
                   onTypeChange={setAppointmentType}
                   selectedSlot={selectedSlot}
-                  onSelect={handleSlotSelect}
-                  availableTypes={doctor.appointmentTypes}
+                  onSelect={setSelectedSlot}
                 />
               </div>
               {selectedSlot && (
@@ -230,15 +283,14 @@ export default function AppointmentBooking() {
               <BookingSummary
                 doctor={doctor}
                 date={selectedDate}
-                time={selectedSlot}
+                time={selectedSlot.time}
                 appointmentType={appointmentType}
                 reason={reason}
-                insurance={insurance}
                 onReasonChange={setReason}
-                onInsuranceChange={setInsurance}
                 onConfirm={handleConfirm}
                 onBack={() => setStep(2)}
                 loading={loading}
+                errorMessage={bookingError}
               />
             </div>
           )}
