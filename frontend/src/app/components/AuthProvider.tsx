@@ -29,14 +29,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setPatientProfile(p);
         setDoctorProfile(null);
       } else if (currentUser.role === "DOCTOR") {
-        const d = await doctorsService.list({ search: `${currentUser.first_name} ${currentUser.last_name}` });
-        // We can fetch details of doctor using the doctor ID that belongs to currentUser
-        // Let's get doctor by user_id
-        const docProfile = d.find((doc) => doc.user_id === currentUser.id);
-        if (docProfile) {
-          const detailedDoc = await doctorsService.getById(docProfile.id);
-          setDoctorProfile(detailedDoc);
-        }
+        const d = await doctorsService.getMe();
+        setDoctorProfile(d);
         setPatientProfile(null);
       }
     } catch (err) {
@@ -115,16 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        patientProfile,
-        doctorProfile,
-        loading,
-        refreshUser,
-        login,
-        register,
-        logout,
-      }}
+      value={{ user, patientProfile, doctorProfile, loading, refreshUser, login, register, logout }}
     >
       {children}
     </AuthContext.Provider>

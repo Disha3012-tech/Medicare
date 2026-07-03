@@ -68,7 +68,10 @@ export const doctorsService = {
   async getAvailability(doctorId: string): Promise<AvailabilitySlot[]> {
     return api.get(`/doctors/${doctorId}/availability`);
   },
-
+  
+  async getMe(): Promise<Doctor> {
+  return api.get("/doctors/me");
+  },
   async setMyAvailability(slots: AvailabilitySlot[]): Promise<AvailabilitySlot[]> {
     return api.put("/doctors/me/availability", slots);
   }

@@ -105,7 +105,15 @@ def get_availability(doctor_id: str, db: Session = Depends(get_db)):
     return db.query(AvailabilitySlot).filter(
         AvailabilitySlot.doctor_id == doctor_id, AvailabilitySlot.is_active.is_(True)
     ).all()
-
+@router.get("/me", response_model=DoctorOut)
+def get_my_profile(
+    current_user: User = Depends(require_roles(Role.DOCTOR)),
+    db: Session = Depends(get_db),
+):
+    doctor = db.query(Doctor).options(joinedload(Doctor.user)).filter(Doctor.user_id == current_user.id).first()
+    if not doctor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+    return _serialize_doctor(doctor)
 
 @router.put("/me/availability", response_model=List[AvailabilitySlotOut])
 def set_my_availability(
