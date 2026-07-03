@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, X, CheckCheck } from "lucide-react";
 import { useNavigate } from "react-router";
-import { NOTIFICATIONS, type Notification } from "../data/notifications";
+import { notificationsService, type Notification } from "../services/notifications";
 import NotificationItem from "./NotificationItem";
+import { useAuth } from "./AuthProvider";
 
 export default function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Notification[]>(NOTIFICATIONS.slice(0, 5));
+  const [items, setItems] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-  const unread = items.filter(n => !n.read).length;
+  const { user } = useAuth();
+  const unread = items.filter(n => !n.is_read).length;
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -19,13 +21,22 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  function markAllRead() {
-    setItems(i => i.map(n => ({ ...n, read: true })));
+  useEffect(() => {
+    if (!user) return;
+    notificationsService.getMine().then(setItems).catch(console.error);
+  }, [user]);
+
+  async function markAllRead() {
+    await notificationsService.markAllRead().catch(console.error);
+    setItems(i => i.map(n => ({ ...n, is_read: true })));
   }
 
-  function markRead(id: string) {
-    setItems(i => i.map(n => n.id === id ? { ...n, read: true } : n));
+  async function markRead(id: string) {
+    await notificationsService.markRead(id).catch(console.error);
+    setItems(i => i.map(n => n.id === id ? { ...n, is_read: true } : n));
   }
+
+  const notifPath = user?.role === "DOCTOR" ? "/doctor/settings" : "/patient/notifications";
 
   return (
     <div className="relative" ref={ref}>
@@ -63,20 +74,20 @@ export default function NotificationBell() {
             {items.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No notifications</p>
             ) : (
-              items.map(n => (
+              items.slice(0, 5).map(n => (
                 <NotificationItem
                   key={n.id}
                   notification={n}
                   compact
                   onRead={() => markRead(n.id)}
-                  onClick={() => { markRead(n.id); setOpen(false); if (n.link) navigate(n.link); }}
+                  onClick={() => { markRead(n.id); setOpen(false); }}
                 />
               ))
             )}
           </div>
 
           <div className="px-4 py-3 border-t border-border">
-            <button onClick={() => { setOpen(false); navigate("/patient/notifications"); }} className="text-xs text-accent hover:underline w-full text-center">
+            <button onClick={() => { setOpen(false); navigate(notifPath); }} className="text-xs text-accent hover:underline w-full text-center">
               View all notifications
             </button>
           </div>

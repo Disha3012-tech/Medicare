@@ -52,7 +52,12 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
   );
 }
 
-let _addToast: (t: Omit<ToastProps, "id" | "onDismiss">) => void = () => {};
+type ToastListener = (toast: Omit<ToastProps, "id" | "onDismiss">) => void;
+const listeners = new Set<ToastListener>();
+
+export function showToast(type: ToastType, title: string, body?: string) {
+  listeners.forEach(l => l({ type, title, body }));
+}
 
 export function useToast() {
   const [toasts, setToasts] = useState<ToastProps[]>([]);
@@ -65,6 +70,14 @@ export function useToast() {
   function dismiss(id: string) {
     setToasts(ts => ts.filter(t => t.id !== id));
   }
+
+  useEffect(() => {
+    const listener: ToastListener = (t) => add(t);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }, []);
 
   return { toasts, add, dismiss };
 }

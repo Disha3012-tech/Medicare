@@ -23,6 +23,7 @@ import ErrorPage from "./pages/ErrorPage";
 import PatientProfileSetup from "./pages/PatientProfileSetup";
 import DoctorProfileSetup from "./pages/DoctorProfileSetup";
 import Messaging from "./pages/Messaging";
+import { RouteGuard } from "./components/RouteGuard";
 
 export const router = createBrowserRouter([
   {
@@ -33,34 +34,34 @@ export const router = createBrowserRouter([
       { path: "auth",                                    Component: Auth },
 
       // Onboarding
-      { path: "patient/setup",                           Component: PatientProfileSetup },
-      { path: "doctor/setup",                            Component: DoctorProfileSetup },
+      { path: "patient/setup",                           element: <RouteGuard allowedRole="PATIENT"><PatientProfileSetup /></RouteGuard> },
+      { path: "doctor/setup",                            element: <RouteGuard allowedRole="DOCTOR"><DoctorProfileSetup /></RouteGuard> },
 
       // Patient routes
-      { path: "patient",                                 Component: PatientDashboard },
-      { path: "patient/history",                         Component: AppointmentHistory },
-      { path: "patient/records",                         Component: MedicalRecords },
-      { path: "patient/prescriptions",                   Component: Prescriptions },
-      { path: "patient/notifications",                   Component: Notifications },
-      { path: "patient/settings",                        Component: PatientSettings },
+      { path: "patient",                                 element: <RouteGuard allowedRole="PATIENT"><PatientDashboard /></RouteGuard> },
+      { path: "patient/history",                         element: <RouteGuard allowedRole="PATIENT"><AppointmentHistory /></RouteGuard> },
+      { path: "patient/records",                         element: <RouteGuard allowedRole="PATIENT"><MedicalRecords /></RouteGuard> },
+      { path: "patient/prescriptions",                   element: <RouteGuard allowedRole="PATIENT"><Prescriptions /></RouteGuard> },
+      { path: "patient/notifications",                   element: <RouteGuard allowedRole="PATIENT"><Notifications /></RouteGuard> },
+      { path: "patient/settings",                        element: <RouteGuard allowedRole="PATIENT"><PatientSettings /></RouteGuard> },
 
       // Doctor portal — static paths before dynamic :id
-      { path: "doctor",                                  Component: DoctorDashboard },
-      { path: "doctor/patients",                         Component: DoctorPatients },
-      { path: "doctor/prescriptions",                    Component: DoctorPrescription },
-      { path: "doctor/analytics",                        Component: DoctorAnalytics },
-      { path: "doctor/availability",                     Component: DoctorAvailability },
-      { path: "doctor/settings",                         Component: DoctorSettings },
-      { path: "doctor/:id",                              Component: DoctorProfile },
+      { path: "doctor",                                  element: <RouteGuard allowedRole="DOCTOR"><DoctorDashboard /></RouteGuard> },
+      { path: "doctor/patients",                         element: <RouteGuard allowedRole="DOCTOR"><DoctorPatients /></RouteGuard> },
+      { path: "doctor/prescriptions",                    element: <RouteGuard allowedRole="DOCTOR"><DoctorPrescription /></RouteGuard> },
+      { path: "doctor/analytics",                        element: <RouteGuard allowedRole="DOCTOR"><DoctorAnalytics /></RouteGuard> },
+      { path: "doctor/availability",                     element: <RouteGuard allowedRole="DOCTOR"><DoctorAvailability /></RouteGuard> },
+      { path: "doctor/settings",                         element: <RouteGuard allowedRole="DOCTOR"><DoctorSettings /></RouteGuard> },
+      { path: "doctor/:id",                              element: <RouteGuard><DoctorProfile /></RouteGuard> },
 
       // Discovery & booking
-      { path: "find-doctors",                            Component: FindDoctors },
-      { path: "book/:id",                                Component: AppointmentBooking },
+      { path: "find-doctors",                            element: <RouteGuard allowedRole="PATIENT"><FindDoctors /></RouteGuard> },
+      { path: "book/:id",                                element: <RouteGuard allowedRole="PATIENT"><AppointmentBooking /></RouteGuard> },
 
       // Messaging & utilities
-      { path: "messages",                                Component: Messaging },
-      { path: "symptom-checker",                         Component: SymptomChecker },
-      { path: "consultation/:id",                        Component: VideoConsultation },
+      { path: "messages",                                element: <RouteGuard><Messaging /></RouteGuard> },
+      { path: "symptom-checker",                         element: <RouteGuard><SymptomChecker /></RouteGuard> },
+      { path: "consultation/:id",                        element: <RouteGuard><VideoConsultation /></RouteGuard> },
 
       { path: "*",                                       Component: NotFound },
     ],

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { HeartPulse, Eye, EyeOff, User, Stethoscope, ArrowLeft, CheckCircle2, Shield } from "lucide-react";
+import { useAuth } from "../components/AuthProvider";
 
 type Role = "patient" | "doctor";
 type Mode = "login" | "signup";
@@ -14,6 +15,7 @@ export default function Auth() {
   const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { login: performLogin, register: performRegister } = useAuth();
 
   useEffect(() => {
     const m = params.get("mode") as Mode;
@@ -22,20 +24,49 @@ export default function Auth() {
     if (r) setRole(r);
   }, [params]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (!form.email || !form.password) { setError("Please fill in all required fields."); return; }
     if (mode === "signup" && !form.name) { setError("Please enter your name."); return; }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    
+    try {
       if (mode === "signup") {
+        const [first_name = "", ...lastNameParts] = form.name.trim().split(/\s+/);
+        const last_name = lastNameParts.join(" ") || "-";
+
+        await performRegister({
+          email: form.email,
+          password: form.password,
+          first_name,
+          last_name,
+          role: role.toUpperCase(),
+        });
+
+        if (role === "doctor" && form.specialty) {
+          const { doctorsService } = await import("../services/doctors");
+          try {
+            await doctorsService.updateMe({ specialty: form.specialty });
+          } catch (err) {
+            console.error("Failed to update specialty after signup:", err);
+          }
+        }
+
         navigate(role === "doctor" ? "/doctor/setup" : "/patient/setup");
       } else {
+        await performLogin({
+          email: form.email,
+          password: form.password,
+        });
         navigate(role === "doctor" ? "/doctor" : "/patient");
       }
-    }, 900);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Authentication failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const leftPanelContent = {

@@ -7,6 +7,7 @@ import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import FloatingAIAssistant from "./FloatingAIAssistant";
 import { useState } from "react";
+import { useAuth } from "./AuthProvider";
 
 const NAV = [
   { path: "/patient",               label: "Overview",         icon: LayoutDashboard, exact: true },
@@ -29,9 +30,21 @@ export default function PatientShell({ title, subtitle, children, actions }: Pro
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const isActive = (path: string, exact?: boolean) =>
     exact ? pathname === path : pathname.startsWith(path);
+
+  const initials = user
+    ? `${user.first_name[0] || ""}${user.last_name[0] || ""}`.toUpperCase()
+    : "?";
+
+  const displayName = user ? `${user.first_name} ${user.last_name}` : "Patient";
+
+  async function handleLogout() {
+    await logout();
+    navigate("/auth");
+  }
 
   return (
     <div className="min-h-screen bg-background flex font-['Inter',sans-serif]">
@@ -43,9 +56,15 @@ export default function PatientShell({ title, subtitle, children, actions }: Pro
         </button>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-semibold text-sm flex-shrink-0">AJ</div>
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt={displayName} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-semibold text-sm flex-shrink-0">
+                {initials}
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Alex Johnson</p>
+              <p className="text-sm font-medium text-foreground truncate">{displayName}</p>
               <p className="text-xs text-muted-foreground">Patient</p>
             </div>
           </div>
@@ -68,7 +87,7 @@ export default function PatientShell({ title, subtitle, children, actions }: Pro
           <button onClick={() => { navigate("/patient/settings"); setOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive("/patient/settings") ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
             <Settings className="w-4 h-4" /> Settings
           </button>
-          <button onClick={() => navigate("/")} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-all">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-all">
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
