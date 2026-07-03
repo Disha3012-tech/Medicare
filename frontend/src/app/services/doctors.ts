@@ -9,9 +9,9 @@ export interface Qualification {
 
 export interface AvailabilitySlot {
   id?: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
+  day_of_week: number; // 0=Sunday ... 6=Saturday
+  start_time: string;  // "09:00"
+  end_time: string;    // "17:00"
   slot_minutes?: number;
   is_active?: boolean;
 }
@@ -31,6 +31,9 @@ export interface Doctor {
   is_verified: boolean;
   average_rating: number;
   total_reviews: number;
+  first_name: string;
+  last_name: string;
+  avatar_url?: string;
 }
 
 export const doctorsService = {
@@ -70,3 +73,12 @@ export const doctorsService = {
     return api.put("/doctors/me/availability", slots);
   }
 };
+
+// Helper used across doctor-facing UI — real name and full location string
+export function doctorFullName(d: Pick<Doctor, "first_name" | "last_name">): string {
+  return `Dr. ${d.first_name} ${d.last_name}`;
+}
+
+export function doctorLocation(d: Pick<Doctor, "clinic_city" | "clinic_state">): string {
+  return [d.clinic_city, d.clinic_state].filter(Boolean).join(", ") || "Location not set";
+}

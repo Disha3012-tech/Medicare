@@ -50,6 +50,10 @@ class DoctorOut(BaseModel):
     is_verified: bool
     average_rating: float
     total_reviews: int
+    # New — pulled from the related User row so the frontend has a real name/avatar
+    first_name: str
+    last_name: str
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

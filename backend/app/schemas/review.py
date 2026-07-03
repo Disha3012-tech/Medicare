@@ -17,6 +17,7 @@ class ReviewOut(BaseModel):
     rating: int
     comment: Optional[str] = None
     created_at: datetime
+    patient_name: str
 
     class Config:
         from_attributes = True

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Send, X, Users, MessageSquare, HeartPulse, CalendarCheck2, Mic, MicOff } from "lucide-react";
-import { DOCTORS } from "../data/doctors";
+import { doctorsService, doctorFullName, type Doctor } from "../services/doctors";
 import ConsultationInfo from "../components/ConsultationInfo";
 import VideoControls from "../components/VideoControls";
 import Participants from "../components/Participants";
@@ -21,10 +21,15 @@ const INITIAL_MESSAGES: ChatMsg[] = [
   { id: "m2", sender: "you", text: "Of course, no rush.", time: "10:29 AM" },
 ];
 
+const AVATAR_FALLBACK = "https://api.dicebear.com/7.x/initials/svg?seed=";
+
 export default function VideoConsultation() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const doctor = DOCTORS.find(d => d.id === id) ?? DOCTORS[0];
+
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
+  const [loadingDoctor, setLoadingDoctor] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
   const [status, setStatus] = useState<CallStatus>("waiting");
   const [elapsed, setElapsed] = useState(0);
@@ -37,11 +42,21 @@ export default function VideoConsultation() {
   const [draft, setDraft] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Fetch the real doctor for this appointment/room
+  useEffect(() => {
+    if (!id) { setNotFound(true); setLoadingDoctor(false); return; }
+    doctorsService.getById(id)
+      .then(setDoctor)
+      .catch(() => setNotFound(true))
+      .finally(() => setLoadingDoctor(false));
+  }, [id]);
+
   // Simulate doctor joining after 3s
   useEffect(() => {
+    if (!doctor) return;
     const t = setTimeout(() => setStatus("connected"), 3000);
     return () => clearTimeout(t);
-  }, []);
+  }, [doctor]);
 
   // Timer
   useEffect(() => {
@@ -55,7 +70,6 @@ export default function VideoConsultation() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Simulate doctor reply after patient sends a message
   function sendMessage() {
     if (!draft.trim()) return;
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -84,9 +98,36 @@ export default function VideoConsultation() {
     setStatus("ended");
   }
 
+  if (loadingDoctor) {
+    return (
+      <div className="h-screen bg-zinc-950 flex items-center justify-center font-['Inter',sans-serif]">
+        <div className="flex gap-1">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="w-2 h-2 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !doctor) {
+    return (
+      <div className="h-screen bg-zinc-950 flex items-center justify-center font-['Inter',sans-serif]">
+        <div className="text-center">
+          <HeartPulse className="w-10 h-10 text-white/30 mx-auto mb-4" />
+          <p className="font-['Fraunces',serif] text-xl font-semibold text-white mb-2">Consultation not found</p>
+          <button onClick={() => navigate("/patient")} className="text-sm text-accent hover:underline">Back to dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  const doctorName = doctorFullName(doctor);
+  const doctorAvatar = doctor.avatar_url || `${AVATAR_FALLBACK}${encodeURIComponent(doctorName)}`;
+
   const participants = [
-    { id: "p1", name: doctor.name, role: "doctor" as const, avatar: doctor.avatar, isMuted: false, isCameraOff: false, isConnected: status === "connected" },
-    { id: "p2", name: "Alex Johnson", role: "patient" as const, isMuted, isCameraOff, isConnected: true },
+    { id: "p1", name: doctorName, role: "doctor" as const, avatar: doctorAvatar, isMuted: false, isCameraOff: false, isConnected: status === "connected" },
+    { id: "p2", name: "You", role: "patient" as const, isMuted, isCameraOff, isConnected: true },
   ];
 
   if (status === "ended") {
@@ -98,7 +139,7 @@ export default function VideoConsultation() {
           </div>
           <h1 className="font-['Fraunces',serif] text-3xl font-semibold text-foreground mb-2">Call ended</h1>
           <p className="text-muted-foreground mb-2">
-            Your consultation with <span className="font-medium text-foreground">{doctor.name}</span> has ended.
+            Your consultation with <span className="font-medium text-foreground">{doctorName}</span> has ended.
           </p>
           <p className="font-['DM_Mono',monospace] text-sm text-muted-foreground mb-8">
             Duration: {Math.floor(elapsed / 60)}m {elapsed % 60}s
@@ -126,42 +167,30 @@ export default function VideoConsultation() {
 
   return (
     <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden font-['Inter',sans-serif]">
-      {/* Header */}
       <ConsultationInfo
-        doctorName={doctor.name}
+        doctorName={doctorName}
         specialty={doctor.specialty}
         elapsedSeconds={elapsed}
         status={status}
       />
 
-      {/* Main content */}
       <div className="flex-1 flex min-h-0">
-        {/* Video area */}
         <div className="flex-1 relative min-w-0">
           {status === "waiting" ? (
-            /* Waiting room */
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
                 <div className="relative mx-auto mb-6 w-28 h-28">
                   <div className="w-28 h-28 rounded-full overflow-hidden ring-4 ring-white/10">
-                    <img
-                      src={`https://images.unsplash.com/${doctor.avatar}?w=112&h=112&fit=crop&auto=format`}
-                      alt={doctor.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={doctorAvatar} alt={doctorName} className="w-full h-full object-cover" />
                   </div>
                   <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-yellow-400 border-2 border-zinc-950 animate-pulse" />
                 </div>
-                <p className="font-['Fraunces',serif] text-2xl font-semibold text-white mb-1">{doctor.name}</p>
+                <p className="font-['Fraunces',serif] text-2xl font-semibold text-white mb-1">{doctorName}</p>
                 <p className="text-white/50 text-sm mb-6">{doctor.specialty}</p>
                 <div className="flex items-center justify-center gap-2 text-white/60 text-sm">
                   <div className="flex gap-1">
                     {[0, 1, 2].map(i => (
-                      <div
-                        key={i}
-                        className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce"
-                        style={{ animationDelay: `${i * 150}ms` }}
-                      />
+                      <div key={i} className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                     ))}
                   </div>
                   Waiting for the doctor to join
@@ -169,32 +198,23 @@ export default function VideoConsultation() {
               </div>
             </div>
           ) : (
-            /* Active call */
             <>
-              {/* Doctor's main video (simulated with gradient + image overlay) */}
               <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 to-zinc-800 flex items-center justify-center overflow-hidden">
                 {!participants[0].isCameraOff ? (
                   <div className="w-full h-full opacity-60 blur-none">
-                    <img
-                      src={`https://images.unsplash.com/${doctor.avatar}?w=800&h=600&fit=crop&auto=format`}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      aria-hidden="true"
-                    />
+                    <img src={doctorAvatar} alt="" className="w-full h-full object-cover" aria-hidden="true" />
                   </div>
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-zinc-700 flex items-center justify-center text-3xl font-semibold text-white/60">
-                    {doctor.name.split(" ").map(n => n[0]).join("")}
+                    {doctorName.split(" ").map(n => n[0]).join("")}
                   </div>
                 )}
-                {/* Doctor name badge */}
                 <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5">
                   {participants[0].isMuted && <MicOff className="w-3.5 h-3.5 text-red-400" />}
-                  <span className="text-white text-sm">{doctor.name}</span>
+                  <span className="text-white text-sm">{doctorName}</span>
                 </div>
               </div>
 
-              {/* Screen share overlay */}
               {isScreenSharing && (
                 <div className="absolute inset-0 bg-zinc-950/90 flex items-center justify-center z-10">
                   <div className="text-center">
@@ -207,15 +227,14 @@ export default function VideoConsultation() {
                 </div>
               )}
 
-              {/* PiP — your video */}
               <div className="absolute top-4 right-4 z-20 w-36 aspect-video rounded-xl overflow-hidden bg-zinc-800 ring-2 ring-white/10 shadow-xl">
                 {isCameraOff ? (
                   <div className="w-full h-full flex items-center justify-center">
-                    <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white/60 text-sm font-semibold">AJ</div>
+                    <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white/60 text-sm font-semibold">You</div>
                   </div>
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-primary/30 to-accent/20 flex items-center justify-center">
-                    <div className="w-10 h-10 rounded-full bg-primary/40 flex items-center justify-center text-white font-semibold text-sm">AJ</div>
+                    <div className="w-10 h-10 rounded-full bg-primary/40 flex items-center justify-center text-white font-semibold text-sm">You</div>
                   </div>
                 )}
                 {isMuted && (
@@ -229,10 +248,8 @@ export default function VideoConsultation() {
           )}
         </div>
 
-        {/* Sidebar */}
         {sidebarOpen && (
           <div className="w-72 flex-shrink-0 bg-zinc-900/95 border-l border-white/10 flex flex-col">
-            {/* Sidebar tabs */}
             <div className="flex border-b border-white/10">
               {(["chat", "participants"] as SidebarTab[]).map(tab => (
                 <button
@@ -244,16 +261,11 @@ export default function VideoConsultation() {
                   {tab}
                 </button>
               ))}
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="px-3 text-white/30 hover:text-white/70 transition-colors"
-                aria-label="Close sidebar"
-              >
+              <button onClick={() => setSidebarOpen(false)} className="px-3 text-white/30 hover:text-white/70 transition-colors" aria-label="Close sidebar">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Chat */}
             {sidebarTab === "chat" && (
               <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
@@ -290,7 +302,6 @@ export default function VideoConsultation() {
               </>
             )}
 
-            {/* Participants */}
             {sidebarTab === "participants" && (
               <div className="flex-1 overflow-y-auto">
                 <Participants participants={participants} />
@@ -300,7 +311,6 @@ export default function VideoConsultation() {
         )}
       </div>
 
-      {/* Controls */}
       <VideoControls
         isMuted={isMuted}
         isCameraOff={isCameraOff}

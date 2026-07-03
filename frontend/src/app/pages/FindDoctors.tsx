@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Search, LayoutGrid, List, SlidersHorizontal, X, HeartPulse } from "lucide-react";
 import DoctorCard from "../components/DoctorCard";
 import DoctorFilters, { FilterState, DEFAULT_FILTERS } from "../components/DoctorFilters";
-import { DOCTORS } from "../data/doctors";
+import LoadingSkeleton from "../components/LoadingSkeleton";
+import { doctorsService, type Doctor } from "../services/doctors";
 
 type Layout = "grid" | "list";
 
@@ -16,42 +17,43 @@ const SORT_OPTIONS = [
 
 export default function FindDoctors() {
   const navigate = useNavigate();
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [layout, setLayout] = useState<Layout>("list");
   const [sort, setSort] = useState("rating");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  useEffect(() => {
+    setLoading(true);
+    doctorsService.list({
+      specialty: filters.specialty !== "All Specialties" ? filters.specialty : undefined,
+      min_rating: filters.minRating > 0 ? filters.minRating : undefined,
+      search: query || undefined,
+    })
+      .then(setDoctors)
+      .catch(err => setError(err.message || "Failed to load doctors"))
+      .finally(() => setLoading(false));
+  }, [filters.specialty, filters.minRating, query]);
+
   const filtered = useMemo(() => {
-    let docs = DOCTORS.filter(d => {
-      if (query) {
-        const q = query.toLowerCase();
-        if (!d.name.toLowerCase().includes(q) && !d.specialty.toLowerCase().includes(q) && !d.tags.some(t => t.toLowerCase().includes(q))) return false;
-      }
-      if (filters.specialty !== "All Specialties" && d.specialty !== filters.specialty) return false;
-      if (filters.minRating > 0 && d.rating < filters.minRating) return false;
-      if (filters.appointmentType !== "any" && !d.appointmentTypes.includes(filters.appointmentType as "in-person" | "video")) return false;
-      if (filters.insurance && !d.insurances.includes(filters.insurance)) return false;
-      if (filters.maxFee < 500 && d.consultationFee > filters.maxFee) return false;
-      if (filters.availability === "today" && !d.nextAvailable.toLowerCase().includes("today")) return false;
-      if (filters.availability === "this-week" && !["today", "tomorrow", "jul 1", "jul 2", "jul 3", "jul 4", "jul 5", "jul 6", "jul 7"].some(s => d.nextAvailable.toLowerCase().includes(s))) return false;
-      return true;
-    });
+    let docs = doctors.filter(d => filters.maxFee >= 500 || d.consultation_fee <= filters.maxFee);
 
     docs = [...docs].sort((a, b) => {
-      if (sort === "rating") return b.rating - a.rating || b.reviewCount - a.reviewCount;
-      if (sort === "fee-asc") return a.consultationFee - b.consultationFee;
-      if (sort === "fee-desc") return b.consultationFee - a.consultationFee;
-      if (sort === "experience") return b.yearsExperience - a.yearsExperience;
+      if (sort === "rating") return b.average_rating - a.average_rating || b.total_reviews - a.total_reviews;
+      if (sort === "fee-asc") return a.consultation_fee - b.consultation_fee;
+      if (sort === "fee-desc") return b.consultation_fee - a.consultation_fee;
+      if (sort === "experience") return b.years_experience - a.years_experience;
       return 0;
     });
 
     return docs;
-  }, [query, filters, sort]);
+  }, [doctors, filters.maxFee, sort]);
 
   return (
     <div className="min-h-screen bg-background font-['Inter',sans-serif]">
-      {/* Top bar */}
       <header className="sticky top-0 z-30 bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
           <button onClick={() => navigate("/")} className="flex items-center gap-2 flex-shrink-0">
@@ -63,7 +65,7 @@ export default function FindDoctors() {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search by name, specialty, or condition…"
+              placeholder="Search by name or specialty…"
               className="w-full bg-input-background border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
             />
             {query && (
@@ -82,16 +84,10 @@ export default function FindDoctors() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex gap-8">
-        {/* Sidebar filters — desktop */}
         <aside className="hidden lg:block w-56 flex-shrink-0 sticky top-24 self-start">
-          <DoctorFilters
-            filters={filters}
-            onChange={setFilters}
-            resultCount={filtered.length}
-          />
+          <DoctorFilters filters={filters} onChange={setFilters} resultCount={filtered.length} />
         </aside>
 
-        {/* Results */}
         <main className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-5 gap-3">
             <div>
@@ -99,7 +95,7 @@ export default function FindDoctors() {
                 {filters.specialty !== "All Specialties" ? filters.specialty : "All Doctors"}
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {filtered.length} {filtered.length === 1 ? "specialist" : "specialists"} available
+                {loading ? "Loading…" : `${filtered.length} ${filtered.length === 1 ? "specialist" : "specialists"} available`}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -111,23 +107,23 @@ export default function FindDoctors() {
                 {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               <div className="hidden sm:flex items-center border border-border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setLayout("list")}
-                  className={`p-2 transition-colors ${layout === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                >
+                <button onClick={() => setLayout("list")} className={`p-2 transition-colors ${layout === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
                   <List className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => setLayout("grid")}
-                  className={`p-2 transition-colors ${layout === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                >
+                <button onClick={() => setLayout("grid")} className={`p-2 transition-colors ${layout === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
                   <LayoutGrid className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col gap-3">{[1,2,3,4].map(i => <LoadingSkeleton key={i} className="h-28 rounded-xl" />)}</div>
+          ) : error ? (
+            <div className="text-center py-20">
+              <p className="text-destructive text-sm">{error}</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="text-center py-20">
               <p className="font-['Fraunces',serif] text-xl font-semibold text-foreground mb-2">No doctors found</p>
               <p className="text-muted-foreground text-sm mb-4">Try adjusting your filters or search term.</p>
@@ -145,17 +141,11 @@ export default function FindDoctors() {
         </main>
       </div>
 
-      {/* Mobile filter drawer */}
       {mobileFiltersOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileFiltersOpen(false)} />
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-card shadow-xl overflow-y-auto p-5">
-            <DoctorFilters
-              filters={filters}
-              onChange={setFilters}
-              onClose={() => setMobileFiltersOpen(false)}
-              resultCount={filtered.length}
-            />
+            <DoctorFilters filters={filters} onChange={setFilters} onClose={() => setMobileFiltersOpen(false)} resultCount={filtered.length} />
           </div>
         </div>
       )}

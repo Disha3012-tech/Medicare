@@ -1,21 +1,26 @@
 import { X, SlidersHorizontal } from "lucide-react";
-import { SPECIALTIES, INSURANCES } from "../data/doctors";
+
+const SPECIALTIES = [
+  "All Specialties",
+  "Cardiology",
+  "Dermatology",
+  "Endocrinology",
+  "General Practice",
+  "Neurology",
+  "Orthopedics",
+  "Pediatrics",
+  "Psychiatry",
+];
 
 export interface FilterState {
   specialty: string;
-  availability: string;
   minRating: number;
-  appointmentType: string;
-  insurance: string;
   maxFee: number;
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   specialty: "All Specialties",
-  availability: "any",
   minRating: 0,
-  appointmentType: "any",
-  insurance: "",
   maxFee: 500,
 };
 
@@ -32,10 +37,7 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
 
   const isDirty =
     filters.specialty !== DEFAULT_FILTERS.specialty ||
-    filters.availability !== "any" ||
     filters.minRating > 0 ||
-    filters.appointmentType !== "any" ||
-    filters.insurance !== "" ||
     filters.maxFee < 500;
 
   return (
@@ -50,10 +52,7 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         </div>
         <div className="flex items-center gap-2">
           {isDirty && (
-            <button
-              onClick={() => onChange(DEFAULT_FILTERS)}
-              className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
-            >
+            <button onClick={() => onChange(DEFAULT_FILTERS)} className="text-xs text-muted-foreground hover:text-foreground underline transition-colors">
               Clear all
             </button>
           )}
@@ -69,7 +68,6 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         <span className="font-medium text-foreground">{resultCount}</span> doctors found
       </p>
 
-      {/* Specialty */}
       <div>
         <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Specialty</label>
         <div className="flex flex-col gap-1">
@@ -85,38 +83,6 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         </div>
       </div>
 
-      {/* Availability */}
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Availability</label>
-        <div className="flex flex-col gap-1.5">
-          {[["any", "Any time"], ["today", "Available today"], ["this-week", "This week"]].map(([val, label]) => (
-            <label key={val} className="flex items-center gap-2.5 cursor-pointer group">
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0 ${filters.availability === val ? "border-primary bg-primary" : "border-border group-hover:border-primary/50"}`}>
-                {filters.availability === val && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
-              </div>
-              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors" onClick={() => set("availability", val)}>{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Appointment type */}
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Appointment type</label>
-        <div className="flex gap-2">
-          {[["any", "Any"], ["in-person", "In-person"], ["video", "Video"]].map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => set("appointmentType", val)}
-              className={`flex-1 text-xs py-2 rounded-lg border transition-all ${filters.appointmentType === val ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Min rating */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Minimum rating</label>
@@ -135,7 +101,6 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         </div>
       </div>
 
-      {/* Max fee */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Max consultation fee</label>
@@ -155,19 +120,6 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>$100</span><span>$500+</span>
         </div>
-      </div>
-
-      {/* Insurance */}
-      <div>
-        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Insurance</label>
-        <select
-          value={filters.insurance}
-          onChange={e => set("insurance", e.target.value)}
-          className="w-full text-sm bg-input-background border border-border rounded-lg px-3 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-        >
-          <option value="">All insurances</option>
-          {INSURANCES.map(ins => <option key={ins} value={ins}>{ins}</option>)}
-        </select>
       </div>
     </aside>
   );

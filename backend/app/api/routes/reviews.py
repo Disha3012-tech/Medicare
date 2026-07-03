@@ -1,7 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.core.database import get_db
@@ -10,6 +10,21 @@ from app.schemas.review import ReviewCreate, ReviewOut
 from app.core.deps import require_roles
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
+
+
+def _serialize_review(review: Review, db: Session) -> ReviewOut:
+    patient = db.query(Patient).options(joinedload(Patient.user)).filter(Patient.id == review.patient_id).first()
+    patient_name = f"{patient.user.first_name} {patient.user.last_name}" if patient and patient.user else "Patient"
+    return ReviewOut(
+        id=review.id,
+        appointment_id=review.appointment_id,
+        patient_id=review.patient_id,
+        doctor_id=review.doctor_id,
+        rating=review.rating,
+        comment=review.comment,
+        created_at=review.created_at,
+        patient_name=patient_name,
+    )
 
 
 @router.post("", response_model=ReviewOut, status_code=status.HTTP_201_CREATED)
@@ -40,7 +55,6 @@ def create_review(
     db.add(review)
     db.flush()
 
-    # Recompute doctor's aggregate rating
     doctor = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
     agg = db.query(func.avg(Review.rating), func.count(Review.id)).filter(
         Review.doctor_id == doctor.id
@@ -50,9 +64,10 @@ def create_review(
 
     db.commit()
     db.refresh(review)
-    return review
+    return _serialize_review(review, db)
 
 
 @router.get("/doctor/{doctor_id}", response_model=List[ReviewOut])
 def list_doctor_reviews(doctor_id: str, db: Session = Depends(get_db)):
-    return db.query(Review).filter(Review.doctor_id == doctor_id).order_by(Review.created_at.desc()).all()
+    reviews = db.query(Review).filter(Review.doctor_id == doctor_id).order_by(Review.created_at.desc()).all()
+    return [_serialize_review(r, db) for r in reviews]

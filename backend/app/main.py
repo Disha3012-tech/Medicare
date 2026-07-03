@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -38,6 +39,19 @@ app.include_router(messages.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
 app.include_router(websocket.router)  # ws endpoints stay at root, not under /api
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print("=== VALIDATION ERROR ===")
+    print("Path:", request.url.path)
+    print("Errors:", exc.errors())
+    print("Body:", exc.body)
+    print("=========================")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 @app.exception_handler(Exception)
