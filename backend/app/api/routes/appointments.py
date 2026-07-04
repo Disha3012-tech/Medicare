@@ -7,7 +7,8 @@ from sqlalchemy import and_, or_
 
 from app.core.database import get_db
 from app.models.models import (
-    Appointment, Doctor, Patient, User, Role, AppointmentStatus, VideoSession, Notification, NotificationType
+    Appointment, Doctor, Patient, User, Role, AppointmentStatus, VideoSession,
+    Notification, NotificationType, BlockedDate
 )
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentOut
 from app.core.deps import get_current_user, require_roles
@@ -16,8 +17,8 @@ from app.ws.manager import manager
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
 
-def _notify(db: Session, user_id: str, ntype: NotificationType, title: str, body: str):
-    note = Notification(user_id=user_id, type=ntype, title=title, body=body)
+def _notify(db: Session, user_id: str, ntype: NotificationType, title: str, body: str, meta: dict = None):
+    note = Notification(user_id=user_id, type=ntype, title=title, body=body, meta=meta)
     db.add(note)
     db.flush()
     return note
@@ -28,14 +29,23 @@ async def book_appointment(
     payload: AppointmentCreate,
     current_user: User = Depends(require_roles(Role.PATIENT)),
     db: Session = Depends(get_db),
-    
 ):
     patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
     doctor = db.query(Doctor).filter(Doctor.id == payload.doctor_id).first()
     if not doctor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
 
-    # Prevent double-booking: overlapping active appointment for same doctor
+    if doctor.is_on_vacation:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This doctor is currently unavailable")
+
+    appt_date = payload.scheduled_at.date()
+    blocked = db.query(BlockedDate).filter(
+        BlockedDate.doctor_id == doctor.id,
+        BlockedDate.date == datetime.combine(appt_date, datetime.min.time()),
+    ).first()
+    if blocked:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This date is unavailable")
+
     window_end = payload.scheduled_at + timedelta(minutes=payload.duration_min)
     conflict = db.query(Appointment).filter(
         Appointment.doctor_id == doctor.id,
@@ -60,10 +70,14 @@ async def book_appointment(
     if payload.type.value == "VIDEO":
         db.add(VideoSession(appointment_id=appointment.id))
 
+    # Store the raw ISO timestamp in `meta` instead of baking a formatted
+    # (UTC) time into the message — the frontend converts to local time
+    # for display, the same way the Schedule tab already does correctly.
     _notify(
         db, doctor.user_id, NotificationType.APPOINTMENT,
         "New appointment request",
-        f"{current_user.first_name} {current_user.last_name} requested an appointment on {payload.scheduled_at.strftime('%b %d, %Y %I:%M %p')}",
+        f"{current_user.first_name} {current_user.last_name} requested a new appointment.",
+        meta={"appointment_id": appointment.id, "scheduled_at": payload.scheduled_at.isoformat()},
     )
 
     db.commit()
@@ -128,7 +142,6 @@ async def update_appointment(
     db.commit()
     db.refresh(appt)
 
-    # Notify the other party of status change
     doctor = db.query(Doctor).filter(Doctor.id == appt.doctor_id).first()
     patient = db.query(Patient).filter(Patient.id == appt.patient_id).first()
     other_user_id = patient.user_id if current_user.role == Role.DOCTOR else doctor.user_id
@@ -136,7 +149,8 @@ async def update_appointment(
     _notify(
         db, other_user_id, NotificationType.APPOINTMENT,
         "Appointment updated",
-        f"Your appointment on {appt.scheduled_at.strftime('%b %d, %Y %I:%M %p')} is now {appt.status.value}",
+        f"Your appointment status is now {appt.status.value}.",
+        meta={"appointment_id": appt.id, "scheduled_at": appt.scheduled_at.isoformat(), "status": appt.status.value},
     )
     db.commit()
 

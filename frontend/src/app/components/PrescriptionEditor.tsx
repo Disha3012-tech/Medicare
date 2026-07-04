@@ -9,11 +9,16 @@ interface Props {
   onCreated: () => void;
   onClose: () => void;
 }
+interface Props {
+  onCreated: () => void;
+  onClose: () => void;
+  initialPatientId?: string;
+}
 
-export default function PrescriptionEditor({ onCreated, onClose }: Props) {
+export default function PrescriptionEditor({ onCreated, onClose, initialPatientId }: Props) {
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
-  const [patientId, setPatientId] = useState("");
+  const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [diagnosis, setDiagnosis] = useState("");
   const [notes, setNotes] = useState("");
   const [medicines, setMedicines] = useState<Medicine[]>([]);
