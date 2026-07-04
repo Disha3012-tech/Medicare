@@ -3,7 +3,9 @@ import { Search, X, Users, Pill, TrendingUp } from "lucide-react";
 import DoctorShell from "../components/DoctorShell";
 import PatientCard from "../components/PatientCard";
 import PatientProfilePreview from "../components/PatientProfilePreview";
+import PrescriptionEditor from "../components/PrescriptionEditor";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { ToastContainer, useToast } from "../components/ToastNotification";
 import { patientsService, type PatientSummary } from "../services/patients";
 
 export default function DoctorPatients() {
@@ -12,6 +14,8 @@ export default function DoctorPatients() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<PatientSummary | null>(null);
+  const [prescribingFor, setPrescribingFor] = useState<string | null>(null);
+  const { toasts, add: addToast, dismiss } = useToast();
 
   useEffect(() => {
     patientsService.getMyPatients()
@@ -84,7 +88,23 @@ export default function DoctorPatients() {
         )}
       </div>
 
-      {selected && <PatientProfilePreview patient={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <PatientProfilePreview
+          patient={selected}
+          onClose={() => setSelected(null)}
+          onWritePrescription={patientId => { setPrescribingFor(patientId); setSelected(null); }}
+        />
+      )}
+
+      {prescribingFor && (
+        <PrescriptionEditor
+          initialPatientId={prescribingFor}
+          onCreated={() => addToast({ type: "success", title: "Prescription created", body: "The patient has been notified." })}
+          onClose={() => setPrescribingFor(null)}
+        />
+      )}
+
+      <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </DoctorShell>
   );
 }

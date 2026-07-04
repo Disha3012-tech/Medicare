@@ -55,8 +55,6 @@ function minutesToTime24(mins: number): string {
   return `${h}:${m}`;
 }
 
-/** Converts the picked-chip WeekSchedule into backend AvailabilitySlot rows,
- *  grouping consecutive 30-min chips per day into contiguous ranges. */
 function scheduleToSlots(schedule: WeekSchedule): AvailabilitySlot[] {
   const result: AvailabilitySlot[] = [];
 
@@ -72,7 +70,6 @@ function scheduleToSlots(schedule: WeekSchedule): AvailabilitySlot[] {
     for (let i = 1; i <= minutesSorted.length; i++) {
       const current = minutesSorted[i];
       if (current === undefined || current - prev > 30) {
-        // close out the current run
         result.push({
           day_of_week: DAY_TO_WEEKDAY[day],
           start_time: minutesToTime24(runStart),
@@ -89,7 +86,6 @@ function scheduleToSlots(schedule: WeekSchedule): AvailabilitySlot[] {
   return result;
 }
 
-/** Converts backend AvailabilitySlot rows back into picked-chip WeekSchedule for display */
 function slotsToSchedule(slots: AvailabilitySlot[]): WeekSchedule {
   const schedule: WeekSchedule = JSON.parse(JSON.stringify(EMPTY_SCHEDULE));
 
@@ -112,7 +108,7 @@ function slotsToSchedule(slots: AvailabilitySlot[]): WeekSchedule {
 }
 
 export default function DoctorAvailability() {
-  const { doctorProfile } = useAuth();
+  const { doctorProfile, refreshUser } = useAuth();
   const [schedule, setSchedule] = useState<WeekSchedule>(EMPTY_SCHEDULE);
   const [vacationMode, setVacationMode] = useState(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -123,8 +119,15 @@ export default function DoctorAvailability() {
 
   useEffect(() => {
     if (!doctorProfile) return;
-    doctorsService.getAvailability(doctorProfile.id)
-      .then(slots => setSchedule(slotsToSchedule(slots)))
+    Promise.all([
+      doctorsService.getAvailability(doctorProfile.id),
+      doctorsService.getBlockedDates(doctorProfile.id),
+    ])
+      .then(([slots, blocked]) => {
+        setSchedule(slotsToSchedule(slots));
+        setBlockedDates(blocked.map(b => b.date.slice(0, 10)));
+        setVacationMode(doctorProfile.is_on_vacation ?? false);
+      })
       .catch(err => addToast({ type: "error", title: "Failed to load availability", body: err.message }))
       .finally(() => setLoading(false));
   }, [doctorProfile]);
@@ -140,7 +143,12 @@ export default function DoctorAvailability() {
     setSaving(true);
     try {
       const slots = vacationMode ? [] : scheduleToSlots(schedule);
-      await doctorsService.setMyAvailability(slots);
+      await Promise.all([
+        doctorsService.setMyAvailability(slots),
+        doctorsService.setMyBlockedDates(blockedDates.map(date => ({ date }))),
+        doctorsService.setVacationMode(vacationMode),
+      ]);
+      await refreshUser();
       addToast({ type: "success", title: "Availability saved", body: "Your schedule has been updated successfully." });
     } catch (err: any) {
       addToast({ type: "error", title: "Failed to save availability", body: err.message || "Please try again." });
@@ -205,9 +213,6 @@ export default function DoctorAvailability() {
                 <CalendarX className="w-4 h-4 text-muted-foreground" /> Block specific dates
               </h2>
               <div className="bg-card rounded-xl border border-border p-5">
-                <p className="text-xs text-muted-foreground mb-4">
-                  Note: date-specific blocking isn't wired to the backend yet — this is a preview only and won't affect real bookings until that's built.
-                </p>
                 <div className="flex items-center justify-between mb-4">
                   <button onClick={() => setViewMonth(m => subMonths(m, 1))} className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-all"><ChevronLeft className="w-4 h-4" /></button>
                   <p className="text-sm font-medium text-foreground">{format(viewMonth, "MMMM yyyy")}</p>
@@ -231,7 +236,7 @@ export default function DoctorAvailability() {
                 </div>
                 {blockedDates.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-border">
-                    <p className="text-xs text-muted-foreground mb-2">{blockedDates.length} date{blockedDates.length !== 1 ? "s" : ""} blocked</p>
+                    <p className="text-xs text-muted-foreground mb-2">{blockedDates.length} date{blockedDates.length !== 1 ? "s" : ""} blocked — click Save to apply</p>
                     <div className="flex flex-wrap gap-1.5">
                       {blockedDates.slice(0, 6).map(d => (
                         <span key={d} className="text-xs bg-destructive/10 text-destructive px-2.5 py-1 rounded-full font-['DM_Mono',monospace]">{d}</span>

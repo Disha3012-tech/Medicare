@@ -6,7 +6,11 @@ export interface Qualification {
   institution: string;
   year: number;
 }
-
+export interface BlockedDate {
+  id?: string;
+  date: string;     // "YYYY-MM-DD"
+  reason?: string;
+}
 export interface AvailabilitySlot {
   id?: string;
   day_of_week: number; // 0=Sunday ... 6=Saturday
@@ -34,6 +38,7 @@ export interface Doctor {
   first_name: string;
   last_name: string;
   avatar_url?: string;
+  is_on_vacation: boolean;
 }
 
 export const doctorsService = {
@@ -52,7 +57,18 @@ export const doctorsService = {
     }
     return api.get("/doctors", { params });
   },
+  async getBlockedDates(doctorId: string): Promise<BlockedDate[]> {
+    return api.get(`/doctors/${doctorId}/blocked-dates`);
+  },
 
+  async setMyBlockedDates(dates: BlockedDate[]): Promise<BlockedDate[]> {
+    return api.put("/doctors/me/blocked-dates", dates);
+  },
+
+  async setVacationMode(is_on_vacation: boolean): Promise<Doctor> {
+    return api.put("/doctors/me/vacation-mode", { is_on_vacation });
+  },
+  
   async getById(id: string): Promise<Doctor> {
     return api.get(`/doctors/${id}`);
   },
