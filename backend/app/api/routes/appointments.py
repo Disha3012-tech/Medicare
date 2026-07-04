@@ -28,6 +28,7 @@ async def book_appointment(
     payload: AppointmentCreate,
     current_user: User = Depends(require_roles(Role.PATIENT)),
     db: Session = Depends(get_db),
+    
 ):
     patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
     doctor = db.query(Doctor).filter(Doctor.id == payload.doctor_id).first()

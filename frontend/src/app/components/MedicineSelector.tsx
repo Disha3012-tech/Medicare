@@ -1,7 +1,27 @@
 import { useState } from "react";
 import { Search, Plus, X } from "lucide-react";
-import { COMMON_MEDICINES } from "../data/prescriptions";
-import type { Medicine } from "../data/prescriptions";
+import type { Medicine } from "../services/prescriptions";
+
+// This is a static autocomplete helper list only — it does not represent
+// real patient data and nothing here is persisted as-is; it just speeds up
+// typing common medicine names when a doctor creates a prescription.
+const COMMON_MEDICINES = [
+  { name: "Metoprolol Succinate", category: "Cardiology", defaultDosage: "25mg" },
+  { name: "Amlodipine", category: "Cardiology", defaultDosage: "5mg" },
+  { name: "Lisinopril", category: "Cardiology", defaultDosage: "10mg" },
+  { name: "Atorvastatin", category: "Cardiology", defaultDosage: "20mg" },
+  { name: "Furosemide", category: "Cardiology", defaultDosage: "40mg" },
+  { name: "Aspirin", category: "General", defaultDosage: "81mg" },
+  { name: "Ibuprofen", category: "Pain", defaultDosage: "400mg" },
+  { name: "Paracetamol", category: "Pain", defaultDosage: "500mg" },
+  { name: "Amoxicillin", category: "Antibiotic", defaultDosage: "500mg" },
+  { name: "Azithromycin", category: "Antibiotic", defaultDosage: "500mg" },
+  { name: "Omeprazole", category: "Gastro", defaultDosage: "20mg" },
+  { name: "Metformin", category: "Diabetes", defaultDosage: "500mg" },
+  { name: "Levothyroxine", category: "Endocrine", defaultDosage: "50mcg" },
+  { name: "Cetirizine", category: "Allergy", defaultDosage: "10mg" },
+  { name: "Sertraline", category: "Psychiatry", defaultDosage: "50mg" },
+];
 
 interface Props { selected: Medicine[]; onChange: (meds: Medicine[]) => void; }
 
@@ -17,7 +37,7 @@ export default function MedicineSelector({ selected, onChange }: Props) {
   ).slice(0, 6);
 
   function startAdd(name: string, defaultDosage: string) {
-    setAdding({ name, generic: name, dosage: defaultDosage, frequency: "Once daily", duration: "30 days", instructions: "" });
+    setAdding({ name, dosage: defaultDosage, frequency: "Once daily", duration: "30 days", instructions: "" });
     setQuery("");
   }
 
@@ -35,7 +55,6 @@ export default function MedicineSelector({ selected, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Selected medicines */}
       {selected.map((med, i) => (
         <div key={i} className="bg-muted/40 rounded-xl p-4 flex items-start gap-3 border border-border/60">
           <div className="flex-1 min-w-0">
@@ -48,7 +67,6 @@ export default function MedicineSelector({ selected, onChange }: Props) {
         </div>
       ))}
 
-      {/* Add medicine */}
       {adding ? (
         <div className="bg-card rounded-xl border-2 border-accent/20 p-4 space-y-3">
           <p className="text-sm font-medium text-foreground">Add: {adding.name}</p>

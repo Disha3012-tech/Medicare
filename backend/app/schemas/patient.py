@@ -49,3 +49,25 @@ class PatientOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PatientSummaryOut(BaseModel):
+    """Used by GET /doctors/me/patients — a doctor's view of their patients."""
+    id: str
+    user_id: str
+    name: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    blood_group: Optional[str] = None
+    phone: Optional[str] = None
+    email: str
+    chronic_conditions: List[str] = []
+    allergies: List[str] = []
+    last_visit: Optional[datetime] = None
+    next_visit: Optional[datetime] = None
+    visit_count: int
+    current_medications: List[str] = []
+    avatar_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
