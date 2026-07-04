@@ -174,13 +174,14 @@ class Doctor(Base):
     total_reviews = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
+    is_on_vacation = Column(Boolean, default=False)
     user = relationship("User", back_populates="doctor_profile")
     qualifications = relationship("Qualification", back_populates="doctor", cascade="all, delete")
     availability = relationship("AvailabilitySlot", back_populates="doctor", cascade="all, delete")
     appointments = relationship("Appointment", back_populates="doctor")
     prescriptions = relationship("Prescription", back_populates="doctor")
     reviews = relationship("Review", back_populates="doctor")
+    blocked_dates = relationship("BlockedDate", back_populates=None, cascade="all, delete")
 
 
 class Qualification(Base):
@@ -194,7 +195,16 @@ class Qualification(Base):
 
     doctor = relationship("Doctor", back_populates="qualifications")
 
+class BlockedDate(Base):
+    __tablename__ = "blocked_dates"
 
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    doctor_id = Column(UUID(as_uuid=False), ForeignKey("doctors.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = Column(DateTime, nullable=False)  # stored as date-only (midnight)
+    reason = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    doctor = relationship("Doctor")
 class AvailabilitySlot(Base):
     __tablename__ = "availability_slots"
 

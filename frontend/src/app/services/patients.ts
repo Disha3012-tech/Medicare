@@ -29,10 +29,30 @@ export interface Patient {
   allergies?: string[];
   chronic_conditions?: string[];
 }
+export interface PatientSummary {
+  id: string;
+  user_id: string;
+  name: string;
+  age?: number;
+  gender?: string;
+  blood_group?: string;
+  phone?: string;
+  email: string;
+  chronic_conditions: string[];
+  allergies: string[];
+  last_visit?: string;
+  next_visit?: string;
+  visit_count: number;
+  current_medications: string[];
+  avatar_url?: string;
+}
 
 export const patientsService = {
   async getMe(): Promise<Patient> {
     return api.get("/patients/me");
+  },
+  async getMyPatients(): Promise<PatientSummary[]> {
+    return api.get("/doctors/me/patients");
   },
 
   async updateMe(payload: Partial<Patient>): Promise<Patient> {

@@ -35,6 +35,12 @@ class PrescriptionOut(BaseModel):
     notes: Optional[str] = None
     issued_at: datetime
     medicines: List[MedicineOut] = []
+    # Joined display fields — not on the raw Prescription row
+    doctor_name: str
+    specialty: str
+    doctor_avatar_url: Optional[str] = None
+    patient_name: str
+    patient_age: Optional[int] = None
 
     class Config:
         from_attributes = True
