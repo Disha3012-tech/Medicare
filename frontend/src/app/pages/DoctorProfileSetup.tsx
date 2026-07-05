@@ -2,53 +2,81 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { HeartPulse, ArrowRight, ArrowLeft, CheckCircle2, Plus, X } from "lucide-react";
 import AvatarSelector, { type AvatarId, getAvatarById } from "../components/AvatarSelector";
+import { useAuth } from "../components/AuthProvider";
+import { authService } from "../services/auth";
+import { doctorsService, type AvailabilitySlot } from "../services/doctors";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 ;
 
 const SPECIALTIES = ["Cardiology","Dermatology","Endocrinology","General Practice","Neurology","Orthopedics","Pediatrics","Psychiatry","Radiology","Oncology"];
-const LANGUAGES    = ["English","Spanish","French","German","Hindi","Arabic","Mandarin","Japanese","Portuguese"];
 const DAYS         = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const TIME_SLOTS   = ["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"];
+const COUNTRY_CODES = ["+91","+1","+44","+61","+971","+65"];
+
+const DAY_TO_WEEKDAY: Record<string, number> = {
+  Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
+};
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Personal Info",
   2: "Qualifications",
   3: "Practice Details",
   4: "Availability",
-  5: "Choose Avatar",
+  
 };
 
 interface FormState {
-  fullName: string; gender: "Male" | "Female" | "";
+  fullName: string; countryCode: string; phone: string; gender: "Male" | "Female" | "";
   specialty: string; experience: string;
   qualifications: string[]; hospital: string;
   clinicAddress: string; city: string; state: string;
-  consultationFee: string; languages: string[];
+  consultationFee: string;
   availableDays: string[]; timeSlots: string[];
   bio: string; avatarId: AvatarId | null;
 }
 
 const INITIAL: FormState = {
-  fullName: "", gender: "",
+  fullName: "", countryCode: "+91", phone: "", gender: "",
   specialty: "", experience: "",
   qualifications: [], hospital: "",
   clinicAddress: "", city: "", state: "",
-  consultationFee: "", languages: ["English"],
+  consultationFee: "",
   availableDays: ["Monday","Tuesday","Wednesday","Thursday","Friday"],
   timeSlots: ["9:00 AM","10:00 AM","11:00 AM","2:00 PM","3:00 PM"],
   bio: "", avatarId: null,
 };
 
+function to24Hour(time12: string): string {
+  const match = time12.match(/(\d+):(\d+)\s?(AM|PM)/i);
+  if (!match) return "00:00";
+  let hour = parseInt(match[1], 10);
+  const minute = match[2];
+  const period = match[3].toUpperCase();
+  if (period === "PM" && hour !== 12) hour += 12;
+  if (period === "AM" && hour === 12) hour = 0;
+  return `${hour.toString().padStart(2, "0")}:${minute}`;
+}
+
+function addMinutes(time24: string, mins: number): string {
+  const [h, m] = time24.split(":").map(Number);
+  const total = h * 60 + m + mins;
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${hh.toString().padStart(2, "0")}:${mm.toString().padStart(2, "0")}`;
+}
+
 export default function DoctorProfileSetup() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [qualInput, setQualInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
-  function toggleList(field: "availableDays" | "timeSlots" | "languages", value: string) {
+  function toggleList(field: "availableDays" | "timeSlots", value: string) {
     const arr = form[field] as string[];
     set(field, arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
   }
@@ -60,19 +88,68 @@ export default function DoctorProfileSetup() {
   }
 
   function canProceed(): boolean {
-    if (step === 1) return !!form.fullName && !!form.gender;
+    if (step === 1) return !!form.fullName && !!form.gender && !!form.phone;
     if (step === 2) return !!form.specialty && !!form.experience;
     if (step === 3) return !!form.hospital && !!form.consultationFee;
-    if (step === 5) return !!form.avatarId;
+    
     return true;
   }
 
   function next() { if (step < 5) setStep((step + 1) as Step); }
   function back() { if (step > 1) setStep((step - 1) as Step); }
 
-  function finish() {
+  async function finish() {
     setSaving(true);
-    setTimeout(() => navigate("/doctor"), 1200);
+    setError("");
+    try {
+      const [firstName = "", ...rest] = form.fullName.trim().split(/\s+/);
+      const lastName = rest.join(" ") || "-";
+
+      await authService.updateMe({
+        first_name: firstName,
+        last_name: lastName,
+        phone: `${form.countryCode} ${form.phone}`,
+      });
+
+      await doctorsService.updateMe({
+        specialty: form.specialty,
+        years_experience: Number(form.experience) || 0,
+        bio: form.bio || undefined,
+        consultation_fee: Number(form.consultationFee) || 0,
+        clinic_name: form.hospital,
+        clinic_address: form.clinicAddress || undefined,
+        clinic_city: form.city || undefined,
+        clinic_state: form.state || undefined,
+      });
+
+      for (const q of form.qualifications) {
+        // Stored as free text — split "Degree, Institution, Year" loosely if possible, else store as degree only
+        await doctorsService.addQualification({ degree: q, institution: form.hospital || "Not specified", year: new Date().getFullYear() });
+      }
+
+      const slots: AvailabilitySlot[] = [];
+      form.availableDays.forEach(day => {
+        form.timeSlots.forEach(time => {
+          const start = to24Hour(time);
+          slots.push({
+            day_of_week: DAY_TO_WEEKDAY[day],
+            start_time: start,
+            end_time: addMinutes(start, 30),
+            slot_minutes: 30,
+            is_active: true,
+          });
+        });
+      });
+      if (slots.length > 0) {
+        await doctorsService.setMyAvailability(slots);
+      }
+
+      await refreshUser();
+      navigate("/doctor");
+    } catch (err: any) {
+      setError(err.message || "Failed to save your profile. Please try again.");
+      setSaving(false);
+    }
   }
 
   return (
@@ -100,16 +177,24 @@ export default function DoctorProfileSetup() {
               {step === 2 && "Your medical qualifications and specialty."}
               {step === 3 && "Where you practice and consultation fees."}
               {step === 4 && "When patients can book appointments with you."}
-              {step === 5 && "Pick an avatar that best represents you."}
+            
             </p>
           </div>
 
-          {/* Step 1: Personal */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Full name *</label>
                 <input value={form.fullName} onChange={e => set("fullName", e.target.value)} placeholder="Dr. Jane Smith" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Phone number *</label>
+                <div className="flex gap-2">
+                  <select value={form.countryCode} onChange={e => set("countryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                    {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input value={form.phone} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Gender *</label>
@@ -122,7 +207,6 @@ export default function DoctorProfileSetup() {
             </div>
           )}
 
-          {/* Step 2: Qualifications */}
           {step === 2 && (
             <div className="space-y-4">
               <div>
@@ -153,7 +237,6 @@ export default function DoctorProfileSetup() {
             </div>
           )}
 
-          {/* Step 3: Practice */}
           {step === 3 && (
             <div className="space-y-4">
               <div>
@@ -165,22 +248,14 @@ export default function DoctorProfileSetup() {
                 <input value={form.clinicAddress} onChange={e => set("clinicAddress", e.target.value)} placeholder="Street address" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring mb-2" />
                 <div className="grid grid-cols-2 gap-2">
                   <input value={form.city} onChange={e => set("city", e.target.value)} placeholder="City" className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                  <input value={form.state} onChange={e => set("state", e.target.value)} placeholder="State / ZIP" className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <input value={form.state} onChange={e => set("state", e.target.value)} placeholder="State" className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Consultation fee ($) *</label>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Consultation fee (₹) *</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                  <input type="number" value={form.consultationFee} onChange={e => set("consultationFee", e.target.value)} placeholder="200" className="w-full bg-input-background border border-border rounded-lg pl-8 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Languages spoken</label>
-                <div className="flex flex-wrap gap-2">
-                  {LANGUAGES.map(l => (
-                    <button key={l} onClick={() => toggleList("languages", l)} className={`text-sm px-3 py-1.5 rounded-xl border-2 transition-all ${form.languages.includes(l) ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{l}</button>
-                  ))}
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                  <input type="number" value={form.consultationFee} onChange={e => set("consultationFee", e.target.value)} placeholder="1500" className="w-full bg-input-background border border-border rounded-lg pl-8 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
               <div>
@@ -190,7 +265,6 @@ export default function DoctorProfileSetup() {
             </div>
           )}
 
-          {/* Step 4: Availability */}
           {step === 4 && (
             <div className="space-y-5">
               <div>
@@ -208,35 +282,15 @@ export default function DoctorProfileSetup() {
                     <button key={t} onClick={() => toggleList("timeSlots", t)} className={`text-sm py-2.5 rounded-xl border-2 transition-all ${form.timeSlots.includes(t) ? "border-primary bg-primary text-primary-foreground font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{t}</button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">{form.timeSlots.length} slots selected · You can adjust this anytime in Availability settings.</p>
+                <p className="text-xs text-muted-foreground mt-2">{form.timeSlots.length} slots selected across {form.availableDays.length} days · You can adjust this anytime in Availability settings.</p>
               </div>
             </div>
           )}
 
-          {/* Step 5: Avatar */}
-          {step === 5 && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Choose an avatar for your public doctor profile.</p>
-              <AvatarSelector
-                gender={(form.gender as "male" | "female")?.toLowerCase() as "male" | "female" || "male"}
-                selected={form.avatarId}
-                onSelect={id => set("avatarId", id)}
-              />
-              {form.avatarId && (
-                <div className="flex items-center gap-3 bg-accent/5 border border-accent/20 rounded-xl p-4">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-secondary flex-shrink-0">
-                    {getAvatarById(form.avatarId)?.svg}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Selected: {getAvatarById(form.avatarId)?.label}</p>
-                    <p className="text-xs text-muted-foreground">Visible to all patients on your profile.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Nav */}
+
+          {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
+
           <div className="flex gap-3 pt-2">
             {step > 1 && (
               <button onClick={back} className="flex items-center gap-1.5 border border-border rounded-xl px-5 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">

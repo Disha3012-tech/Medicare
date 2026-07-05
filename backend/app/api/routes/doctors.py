@@ -41,7 +41,33 @@ def _serialize_doctor(doctor: Doctor) -> DoctorOut:
         avatar_url=doctor.user.avatar_url,
         is_on_vacation=doctor.is_on_vacation,
     )
+from app.schemas.doctor import QualificationOut
 
+
+@router.get("/me/qualifications", response_model=List[QualificationOut])
+def list_my_qualifications(
+    current_user: User = Depends(require_roles(Role.DOCTOR)),
+    db: Session = Depends(get_db),
+):
+    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    if not doctor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+    return db.query(Qualification).filter(Qualification.doctor_id == doctor.id).all()
+
+
+@router.delete("/me/qualifications/{qualification_id}", status_code=status.HTTP_200_OK)
+def delete_qualification(
+    qualification_id: str,
+    current_user: User = Depends(require_roles(Role.DOCTOR)),
+    db: Session = Depends(get_db),
+):
+    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    qual = db.query(Qualification).filter(Qualification.id == qualification_id, Qualification.doctor_id == doctor.id).first()
+    if not qual:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Qualification not found")
+    db.delete(qual)
+    db.commit()
+    return {"success": True}
 
 @router.get("/{doctor_id}/blocked-dates", response_model=List[BlockedDateOut])
 def get_blocked_dates(doctor_id: str, db: Session = Depends(get_db)):

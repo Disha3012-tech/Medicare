@@ -1,13 +1,13 @@
 import { api } from "./api";
 
-export interface EmergencyContact {
+export interface EmergencyContactData {
   name: string;
   relationship: string;
   phone: string;
   email?: string;
 }
 
-export interface InsuranceInfo {
+export interface InsuranceData {
   provider: string;
   policy_number: string;
   group_number?: string;
@@ -29,6 +29,7 @@ export interface Patient {
   allergies?: string[];
   chronic_conditions?: string[];
 }
+
 export interface PatientSummary {
   id: string;
   user_id: string;
@@ -51,23 +52,32 @@ export const patientsService = {
   async getMe(): Promise<Patient> {
     return api.get("/patients/me");
   },
-  async getMyPatients(): Promise<PatientSummary[]> {
-    return api.get("/doctors/me/patients");
-  },
 
   async updateMe(payload: Partial<Patient>): Promise<Patient> {
     return api.patch("/patients/me", payload);
   },
 
-  async updateEmergencyContact(payload: EmergencyContact): Promise<any> {
+  async updateEmergencyContact(payload: EmergencyContactData): Promise<any> {
     return api.put("/patients/me/emergency-contact", payload);
   },
 
-  async updateInsurance(payload: InsuranceInfo): Promise<any> {
+  async getEmergencyContact(): Promise<EmergencyContactData | null> {
+    return api.get("/patients/me/emergency-contact");
+  },
+
+  async updateInsurance(payload: InsuranceData): Promise<any> {
     return api.put("/patients/me/insurance", payload);
+  },
+
+  async getInsurance(): Promise<InsuranceData | null> {
+    return api.get("/patients/me/insurance");
   },
 
   async getById(id: string): Promise<Patient> {
     return api.get(`/patients/${id}`);
-  }
+  },
+
+  async getMyPatients(): Promise<PatientSummary[]> {
+    return api.get("/doctors/me/patients");
+  },
 };

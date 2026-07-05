@@ -1,18 +1,53 @@
-import { useState } from "react";
-import { Save, Building2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Building2, Loader2 } from "lucide-react";
+import { useAuth } from "./AuthProvider";
+import { doctorsService } from "../services/doctors";
 
 export default function ClinicInformation({ onSave }: { onSave?: () => void }) {
+  const { doctorProfile, refreshUser } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
-    hospital: "St. Luke's Medical Center", department: "Cardiology",
-    address: "3555 Cesar Chavez St", city: "San Francisco", state: "CA", zip: "94110",
-    officePhone: "+1 (415) 600-7200", officeEmail: "cardiology@stlukes.org",
-    appointmentTypes: ["in-person", "video"],
-    consultationFee: "220", followUpFee: "120", videoFee: "180",
+    hospital: "", address: "", city: "", state: "", consultationFee: "",
   });
+
+  useEffect(() => {
+    if (!doctorProfile) return;
+    setForm({
+      hospital: doctorProfile.clinic_name || "",
+      address: doctorProfile.clinic_address || "",
+      city: doctorProfile.clinic_city || "",
+      state: doctorProfile.clinic_state || "",
+      consultationFee: String(doctorProfile.consultation_fee ?? ""),
+    });
+    setLoading(false);
+  }, [doctorProfile]);
+
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  function toggleType(t: string) {
-    setForm(f => ({ ...f, appointmentTypes: f.appointmentTypes.includes(t) ? f.appointmentTypes.filter(x => x !== t) : [...f.appointmentTypes, t] }));
+  async function handleSave() {
+    setSaving(true);
+    setError("");
+    try {
+      await doctorsService.updateMe({
+        clinic_name: form.hospital || undefined,
+        clinic_address: form.address || undefined,
+        clinic_city: form.city || undefined,
+        clinic_state: form.state || undefined,
+        consultation_fee: form.consultationFee ? Number(form.consultationFee) : undefined,
+      });
+      await refreshUser();
+      onSave?.();
+    } catch (err: any) {
+      setError(err.message || "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
@@ -21,49 +56,29 @@ export default function ClinicInformation({ onSave }: { onSave?: () => void }) {
         <Building2 className="w-5 h-5 text-accent flex-shrink-0" />
         <p className="text-sm text-muted-foreground">This information is shown to patients when they search for you or view your profile.</p>
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {[["hospital","Hospital / Clinic name"],["department","Department"],["officePhone","Office phone"],["officeEmail","Office email"]].map(([k, label]) => (
-          <div key={k}>
-            <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
-            <input value={(form as any)[k]} onChange={e => set(k, e.target.value)} className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-          </div>
-        ))}
+      <div>
+        <label className="block text-sm font-medium text-foreground mb-1.5">Hospital / Clinic name</label>
+        <input value={form.hospital} onChange={e => set("hospital", e.target.value)} className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
       </div>
       <div>
         <label className="block text-sm font-medium text-foreground mb-1.5">Clinic address</label>
         <input value={form.address} onChange={e => set("address", e.target.value)} className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring mb-2" />
-        <div className="grid grid-cols-3 gap-2">
-          {[["city","City"],["state","State"],["zip","ZIP"]].map(([k, label]) => (
-            <div key={k}>
-              <input value={(form as any)[k]} onChange={e => set(k, e.target.value)} placeholder={label} className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.city} onChange={e => set("city", e.target.value)} placeholder="City" className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input value={form.state} onChange={e => set("state", e.target.value)} placeholder="State" className="w-full bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">Appointment types offered</label>
-        <div className="flex gap-2">
-          {[["in-person","In-person"],["video","Video call"]].map(([val, label]) => (
-            <button key={val} onClick={() => toggleType(val)} className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${form.appointmentTypes.includes(val) ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}>{label}</button>
-          ))}
+        <label className="block text-sm font-medium text-foreground mb-1.5">Consultation fee (₹)</label>
+        <div className="relative max-w-xs">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₹</span>
+          <input type="number" value={form.consultationFee} onChange={e => set("consultationFee", e.target.value)} className="w-full bg-input-background border border-border rounded-lg pl-7 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-foreground mb-2">Consultation fees ($)</label>
-        <div className="grid grid-cols-3 gap-3">
-          {[["consultationFee","New patient"],["followUpFee","Follow-up"],["videoFee","Video call"]].map(([k, label]) => (
-            <div key={k}>
-              <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-                <input type="number" value={(form as any)[k]} onChange={e => set(k, e.target.value)} className="w-full bg-input-background border border-border rounded-lg pl-7 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <button onClick={onSave} className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium text-sm hover:bg-primary/90 transition-all">
-        <Save className="w-4 h-4" /> Save clinic info
+      {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
+      <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium text-sm hover:bg-primary/90 disabled:opacity-60 transition-all">
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        {saving ? "Saving…" : "Save clinic info"}
       </button>
     </div>
   );

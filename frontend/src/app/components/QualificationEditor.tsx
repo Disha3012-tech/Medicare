@@ -1,30 +1,65 @@
-import { useState } from "react";
-import { Plus, Trash2, GraduationCap, Save } from "lucide-react";
-
-interface Qualification { id: string; degree: string; institution: string; year: string; type: "Degree" | "Residency" | "Fellowship" | "Certification"; }
-
-const DEFAULT: Qualification[] = [
-  { id: "q1", type: "Degree", degree: "MD", institution: "Johns Hopkins University School of Medicine", year: "2006" },
-  { id: "q2", type: "Residency", degree: "Residency in Internal Medicine", institution: "UCSF Medical Center", year: "2009" },
-  { id: "q3", type: "Fellowship", degree: "Fellowship in Interventional Cardiology", institution: "Johns Hopkins Hospital", year: "2012" },
-  { id: "q4", type: "Certification", degree: "Board Certification in Cardiovascular Disease", institution: "American Board of Internal Medicine", year: "2013" },
-];
+import { useState, useEffect } from "react";
+import { Plus, Trash2, GraduationCap, Loader2 } from "lucide-react";
+import { doctorsService, type Qualification } from "../services/doctors";
 
 export default function QualificationEditor({ onSave }: { onSave?: () => void }) {
-  const [qualifications, setQualifications] = useState<Qualification[]>(DEFAULT);
+  const [qualifications, setQualifications] = useState<Qualification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [newQ, setNewQ] = useState<Partial<Qualification>>({ type: "Degree" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [newQ, setNewQ] = useState({ degree: "", institution: "", year: "" });
 
-  function add() {
-    if (!newQ.degree || !newQ.institution) return;
-    setQualifications(q => [...q, { id: Date.now().toString(), degree: newQ.degree!, institution: newQ.institution!, year: newQ.year ?? "", type: newQ.type as any }]);
-    setAdding(false); setNewQ({ type: "Degree" });
+  function load() {
+    setLoading(true);
+    doctorsService.getMyQualifications()
+      .then(setQualifications)
+      .catch(err => setError(err.message || "Failed to load qualifications"))
+      .finally(() => setLoading(false));
   }
 
-  const TYPE_COLORS = { Degree: "bg-primary/10 text-primary", Residency: "bg-accent/10 text-accent", Fellowship: "bg-purple-100 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400", Certification: "bg-yellow-50 dark:bg-yellow-950/20 text-yellow-600 dark:text-yellow-400" };
+  useEffect(() => { load(); }, []);
+
+  async function add() {
+    if (!newQ.degree || !newQ.institution) return;
+    setSaving(true);
+    setError("");
+    try {
+      await doctorsService.addQualification({
+        degree: newQ.degree,
+        institution: newQ.institution,
+        year: Number(newQ.year) || new Date().getFullYear(),
+      });
+      setAdding(false);
+      setNewQ({ degree: "", institution: "", year: "" });
+      load();
+      onSave?.();
+    } catch (err: any) {
+      setError(err.message || "Failed to add qualification.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id: string) {
+    try {
+      await doctorsService.deleteQualification(id);
+      setQualifications(qs => qs.filter(q => q.id !== id));
+    } catch (err: any) {
+      setError(err.message || "Failed to delete qualification.");
+    }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  }
 
   return (
     <div className="space-y-4 max-w-2xl">
+      {qualifications.length === 0 && !adding && (
+        <p className="text-sm text-muted-foreground py-4 text-center">No qualifications added yet.</p>
+      )}
+
       {qualifications.map(q => (
         <div key={q.id} className="bg-card rounded-xl border border-border p-4 flex gap-3">
           <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -33,12 +68,9 @@ export default function QualificationEditor({ onSave }: { onSave?: () => void })
           <div className="flex-1 min-w-0">
             <p className="font-medium text-foreground text-sm">{q.degree}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{q.institution}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_COLORS[q.type]}`}>{q.type}</span>
-              {q.year && <span className="font-['DM_Mono',monospace] text-xs text-muted-foreground">{q.year}</span>}
-            </div>
+            <span className="font-['DM_Mono',monospace] text-xs text-muted-foreground">{q.year}</span>
           </div>
-          <button onClick={() => setQualifications(qs => qs.filter(x => x.id !== q.id))} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+          <button onClick={() => q.id && remove(q.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -48,27 +80,22 @@ export default function QualificationEditor({ onSave }: { onSave?: () => void })
         <div className="bg-card rounded-xl border-2 border-accent/20 p-5 space-y-3">
           <p className="text-sm font-medium text-foreground">Add qualification</p>
           <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-              <select value={newQ.type} onChange={e => setNewQ(n => ({ ...n, type: e.target.value as any }))} className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                {["Degree","Residency","Fellowship","Certification"].map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
-              <input value={newQ.year ?? ""} onChange={e => setNewQ(n => ({ ...n, year: e.target.value }))} placeholder="e.g. 2018" className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-            </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-muted-foreground mb-1">Degree / Certification name *</label>
-              <input value={newQ.degree ?? ""} onChange={e => setNewQ(n => ({ ...n, degree: e.target.value }))} className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+              <input value={newQ.degree} onChange={e => setNewQ(n => ({ ...n, degree: e.target.value }))} placeholder="e.g. MD, Fellowship in Cardiology" className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-muted-foreground mb-1">Institution *</label>
-              <input value={newQ.institution ?? ""} onChange={e => setNewQ(n => ({ ...n, institution: e.target.value }))} className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+              <input value={newQ.institution} onChange={e => setNewQ(n => ({ ...n, institution: e.target.value }))} className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
+              <input value={newQ.year} onChange={e => setNewQ(n => ({ ...n, year: e.target.value }))} placeholder="e.g. 2018" className="w-full bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
           </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2">
-            <button onClick={add} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 transition-all">Add</button>
+            <button onClick={add} disabled={saving} className="flex-1 bg-primary text-primary-foreground text-sm py-2 rounded-lg hover:bg-primary/90 disabled:opacity-60 transition-all">{saving ? "Adding…" : "Add"}</button>
             <button onClick={() => setAdding(false)} className="px-4 text-sm border border-border rounded-lg text-muted-foreground">Cancel</button>
           </div>
         </div>
@@ -77,10 +104,7 @@ export default function QualificationEditor({ onSave }: { onSave?: () => void })
           <Plus className="w-4 h-4" /> Add qualification
         </button>
       )}
-
-      <button onClick={onSave} className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium text-sm hover:bg-primary/90 transition-all">
-        <Save className="w-4 h-4" /> Save qualifications
-      </button>
+      {error && !adding && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

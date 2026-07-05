@@ -9,6 +9,16 @@ class QualificationIn(BaseModel):
     year: int
 
 
+class QualificationOut(BaseModel):
+    id: str
+    degree: str
+    institution: str
+    year: int
+
+    class Config:
+        from_attributes = True
+
+
 class AvailabilitySlotIn(BaseModel):
     day_of_week: int = Field(ge=0, le=6)
     start_time: str
@@ -23,17 +33,6 @@ class AvailabilitySlotOut(AvailabilitySlotIn):
     class Config:
         from_attributes = True
 
-
-class DoctorUpdate(BaseModel):
-    specialty: Optional[str] = None
-    license_number: Optional[str] = None
-    years_experience: Optional[int] = None
-    bio: Optional[str] = None
-    consultation_fee: Optional[float] = None
-    clinic_name: Optional[str] = None
-    clinic_address: Optional[str] = None
-    clinic_city: Optional[str] = None
-    clinic_state: Optional[str] = None
 
 class BlockedDateIn(BaseModel):
     date: str  # "YYYY-MM-DD"
@@ -51,6 +50,20 @@ class BlockedDateOut(BaseModel):
 
 class VacationModeIn(BaseModel):
     is_on_vacation: bool
+
+
+class DoctorUpdate(BaseModel):
+    specialty: Optional[str] = None
+    license_number: Optional[str] = None
+    years_experience: Optional[int] = None
+    bio: Optional[str] = None
+    consultation_fee: Optional[float] = None
+    clinic_name: Optional[str] = None
+    clinic_address: Optional[str] = None
+    clinic_city: Optional[str] = None
+    clinic_state: Optional[str] = None
+
+
 class DoctorOut(BaseModel):
     id: str
     user_id: str
@@ -65,12 +78,11 @@ class DoctorOut(BaseModel):
     clinic_state: Optional[str] = None
     is_verified: bool
     average_rating: float
-    is_on_vacation: bool = False
     total_reviews: int
-    # New — pulled from the related User row so the frontend has a real name/avatar
     first_name: str
     last_name: str
     avatar_url: Optional[str] = None
+    is_on_vacation: bool = False
 
     class Config:
         from_attributes = True
