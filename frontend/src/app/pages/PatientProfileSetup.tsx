@@ -2,48 +2,55 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { HeartPulse, ArrowRight, ArrowLeft, CheckCircle2, Plus, X } from "lucide-react";
 import AvatarSelector, { type AvatarId, getAvatarById } from "../components/AvatarSelector";
+import { useAuth } from "../components/AuthProvider";
+import { authService } from "../services/auth";
+import { patientsService } from "../services/patients";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4 ;
 
 const BLOOD_GROUPS = ["A+","A-","B+","B-","O+","O-","AB+","AB-"];
 const ALLERGIES_SUGGESTIONS = ["Penicillin","Aspirin","Ibuprofen","Sulfonamides","Latex","Peanuts","Shellfish","Eggs"];
 const DISEASES_SUGGESTIONS  = ["Hypertension","Type 2 Diabetes","Asthma","Hypothyroidism","Anxiety Disorder","GERD","Arthritis","Migraine"];
+const COUNTRY_CODES = ["+91","+1","+44","+61","+971","+65"];
+const RELATIONSHIPS = ["Mother","Father","Spouse","Partner","Sibling","Friend","Other"];
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Personal Info",
   2: "Health Metrics",
   3: "Medical History",
   4: "Emergency & Address",
-  5: "Choose Avatar",
+ 
 };
 
+const GENDER_MAP: Record<string, string> = { Male: "MALE", Female: "FEMALE" };
+
 interface FormState {
-  fullName: string; dob: string; gender: "Male" | "Female" | "";
+  fullName: string; countryCode: string; phone: string; dob: string; gender: "Male" | "Female" | "";
   height: string; weight: string; bloodGroup: string;
-  bloodPressure: string; heartRate: string;
-  allergies: string[]; diseases: string[]; medications: string;
-  emergencyName: string; emergencyRelation: string; emergencyPhone: string;
+  allergies: string[]; diseases: string[];
+  emergencyName: string; emergencyRelation: string; emergencyCountryCode: string; emergencyPhone: string;
   address: string; city: string; state: string; zip: string;
   avatarId: AvatarId | null;
 }
 
 const INITIAL: FormState = {
-  fullName: "", dob: "", gender: "",
+  fullName: "", countryCode: "+91", phone: "", dob: "", gender: "",
   height: "", weight: "", bloodGroup: "O+",
-  bloodPressure: "", heartRate: "",
-  allergies: [], diseases: [], medications: "",
-  emergencyName: "", emergencyRelation: "", emergencyPhone: "",
+  allergies: [], diseases: [],
+  emergencyName: "", emergencyRelation: "", emergencyCountryCode: "+91", emergencyPhone: "",
   address: "", city: "", state: "", zip: "",
   avatarId: null,
 };
 
 export default function PatientProfileSetup() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [allergyInput, setAllergyInput] = useState("");
   const [diseaseInput, setDiseaseInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -60,21 +67,57 @@ export default function PatientProfileSetup() {
   }
 
   function canProceed(): boolean {
-    if (step === 1) return !!form.fullName && !!form.dob && !!form.gender;
+    if (step === 1) return !!form.fullName && !!form.dob && !!form.gender && !!form.phone;
     if (step === 2) return !!form.height && !!form.weight;
-    if (step === 5) return !!form.avatarId;
+  
     return true;
   }
 
   function next() { if (step < 5) setStep((step + 1) as Step); }
   function back() { if (step > 1) setStep((step - 1) as Step); }
 
-  function finish() {
+  async function finish() {
     setSaving(true);
-    setTimeout(() => navigate("/patient"), 1200);
-  }
+    setError("");
+    try {
+      const [firstName = "", ...rest] = form.fullName.trim().split(/\s+/);
+      const lastName = rest.join(" ") || "-";
 
-  const avatar = form.avatarId ? getAvatarById(form.avatarId) : null;
+      await authService.updateMe({
+        first_name: firstName,
+        last_name: lastName,
+        phone: `${form.countryCode} ${form.phone}`,
+      });
+
+      await patientsService.updateMe({
+        date_of_birth: form.dob ? new Date(form.dob).toISOString() : undefined,
+        gender: (GENDER_MAP[form.gender] as any) || undefined,
+        blood_group: form.bloodGroup || undefined,
+        height: form.height ? Number(form.height) : undefined,
+        weight: form.weight ? Number(form.weight) : undefined,
+        allergies: form.allergies,
+        chronic_conditions: form.diseases,
+        address: form.address || undefined,
+        city: form.city || undefined,
+        state: form.state || undefined,
+        zip_code: form.zip || undefined,
+      });
+
+      if (form.emergencyName && form.emergencyPhone) {
+        await patientsService.updateEmergencyContact({
+          name: form.emergencyName,
+          relationship: form.emergencyRelation || "Other",
+          phone: `${form.emergencyCountryCode} ${form.emergencyPhone}`,
+        });
+      }
+
+      await refreshUser();
+      navigate("/patient");
+    } catch (err: any) {
+      setError(err.message || "Failed to save your profile. Please try again.");
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background font-['Inter',sans-serif]">
@@ -87,7 +130,6 @@ export default function PatientProfileSetup() {
       </header>
 
       <div className="max-w-xl mx-auto px-4 py-8">
-        {/* Progress */}
         <div className="flex gap-1.5 mb-8">
           {([1,2,3,4,5] as Step[]).map(s => (
             <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-muted"}`} />
@@ -102,16 +144,24 @@ export default function PatientProfileSetup() {
               {step === 2 && "Your current health measurements."}
               {step === 3 && "Share your medical background so doctors can care for you better."}
               {step === 4 && "Emergency contact and home address."}
-              {step === 5 && "Pick an avatar that represents you."}
+             
             </p>
           </div>
 
-          {/* Step 1: Personal Info */}
           {step === 1 && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Full name *</label>
                 <input value={form.fullName} onChange={e => set("fullName", e.target.value)} placeholder="Alex Johnson" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Phone number *</label>
+                <div className="flex gap-2">
+                  <select value={form.countryCode} onChange={e => set("countryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                    {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input value={form.phone} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Date of birth *</label>
@@ -128,7 +178,6 @@ export default function PatientProfileSetup() {
             </div>
           )}
 
-          {/* Step 2: Health Metrics */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -149,20 +198,9 @@ export default function PatientProfileSetup() {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Blood pressure</label>
-                  <input value={form.bloodPressure} onChange={e => set("bloodPressure", e.target.value)} placeholder="120/80 mmHg" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Heart rate</label>
-                  <input value={form.heartRate} onChange={e => set("heartRate", e.target.value)} placeholder="72 bpm" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                </div>
-              </div>
             </div>
           )}
 
-          {/* Step 3: Medical History */}
           {step === 3 && (
             <div className="space-y-5">
               <div>
@@ -208,15 +246,9 @@ export default function PatientProfileSetup() {
                   ))}
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Current medications <span className="font-normal text-muted-foreground">(optional)</span></label>
-                <textarea value={form.medications} onChange={e => set("medications", e.target.value)} rows={3} placeholder="e.g. Metoprolol 25mg once daily, Omeprazole 20mg…" className="w-full bg-input-background border border-border rounded-lg px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
-              </div>
             </div>
           )}
 
-          {/* Step 4: Emergency & Address */}
           {step === 4 && (
             <div className="space-y-4">
               <div>
@@ -230,12 +262,17 @@ export default function PatientProfileSetup() {
                     <label className="block text-sm font-medium text-foreground mb-1.5">Relationship</label>
                     <select value={form.emergencyRelation} onChange={e => set("emergencyRelation", e.target.value)} className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                       <option value="">Select…</option>
-                      {["Mother","Father","Spouse","Partner","Sibling","Friend","Other"].map(r => <option key={r}>{r}</option>)}
+                      {RELATIONSHIPS.map(r => <option key={r}>{r}</option>)}
                     </select>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-foreground mb-1.5">Phone number</label>
-                    <input value={form.emergencyPhone} onChange={e => set("emergencyPhone", e.target.value)} placeholder="+1 (415) 555-0100" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <div className="flex gap-2">
+                      <select value={form.emergencyCountryCode} onChange={e => set("emergencyCountryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                        {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <input value={form.emergencyPhone} onChange={e => set("emergencyPhone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -253,30 +290,10 @@ export default function PatientProfileSetup() {
             </div>
           )}
 
-          {/* Step 5: Avatar */}
-          {step === 5 && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Choose an avatar. This will be shown on your profile and to doctors.</p>
-              <AvatarSelector
-                gender={(form.gender as "male" | "female")?.toLowerCase() as "male" | "female" || "female"}
-                selected={form.avatarId}
-                onSelect={id => set("avatarId", id)}
-              />
-              {form.avatarId && (
-                <div className="flex items-center gap-3 bg-accent/5 border border-accent/20 rounded-xl p-4">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-secondary flex-shrink-0">
-                    {getAvatarById(form.avatarId)?.svg}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Selected: {getAvatarById(form.avatarId)?.label}</p>
-                    <p className="text-xs text-muted-foreground">You can change this later in Settings.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+        
 
-          {/* Navigation */}
+          {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
+
           <div className="flex gap-3 pt-2">
             {step > 1 && (
               <button onClick={back} className="flex items-center gap-1.5 border border-border rounded-xl px-5 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">

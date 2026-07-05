@@ -11,11 +11,31 @@ class EmergencyContactIn(BaseModel):
     email: Optional[str] = None
 
 
+class EmergencyContactOut(BaseModel):
+    name: str
+    relationship: str
+    phone: str
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class InsuranceInfoIn(BaseModel):
     provider: str
     policy_number: str
     group_number: Optional[str] = None
     valid_until: Optional[datetime] = None
+
+
+class InsuranceInfoOut(BaseModel):
+    provider: str
+    policy_number: str
+    group_number: Optional[str] = None
+    valid_until: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 class PatientUpdate(BaseModel):

@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -7,7 +8,29 @@ from app.schemas.patient import PatientOut, PatientUpdate, EmergencyContactIn, I
 from app.core.deps import require_roles
 
 router = APIRouter(prefix="/patients", tags=["patients"])
+from app.schemas.patient import EmergencyContactOut, InsuranceInfoOut
 
+
+@router.get("/me/emergency-contact", response_model=Optional[EmergencyContactOut])
+def get_my_emergency_contact(
+    current_user: User = Depends(require_roles(Role.PATIENT)),
+    db: Session = Depends(get_db),
+):
+    patient = _get_patient_or_404(db, current_user.id)
+    contact = db.query(EmergencyContact).filter(EmergencyContact.patient_id == patient.id).first()
+    if not contact:
+        return None
+    return EmergencyContactOut(name=contact.name, relationship=contact.relationship_, phone=contact.phone, email=contact.email)
+
+
+@router.get("/me/insurance", response_model=Optional[InsuranceInfoOut])
+def get_my_insurance(
+    current_user: User = Depends(require_roles(Role.PATIENT)),
+    db: Session = Depends(get_db),
+):
+    patient = _get_patient_or_404(db, current_user.id)
+    insurance = db.query(InsuranceInfo).filter(InsuranceInfo.patient_id == patient.id).first()
+    return insurance
 
 def _get_patient_or_404(db: Session, user_id: str) -> Patient:
     patient = db.query(Patient).filter(Patient.user_id == user_id).first()

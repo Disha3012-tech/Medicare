@@ -6,11 +6,7 @@ export interface Qualification {
   institution: string;
   year: number;
 }
-export interface BlockedDate {
-  id?: string;
-  date: string;     // "YYYY-MM-DD"
-  reason?: string;
-}
+
 export interface AvailabilitySlot {
   id?: string;
   day_of_week: number; // 0=Sunday ... 6=Saturday
@@ -18,6 +14,12 @@ export interface AvailabilitySlot {
   end_time: string;    // "17:00"
   slot_minutes?: number;
   is_active?: boolean;
+}
+
+export interface BlockedDate {
+  id?: string;
+  date: string;     // "YYYY-MM-DD"
+  reason?: string;
 }
 
 export interface Doctor {
@@ -57,18 +59,11 @@ export const doctorsService = {
     }
     return api.get("/doctors", { params });
   },
-  async getBlockedDates(doctorId: string): Promise<BlockedDate[]> {
-    return api.get(`/doctors/${doctorId}/blocked-dates`);
+
+  async getMe(): Promise<Doctor> {
+    return api.get("/doctors/me");
   },
 
-  async setMyBlockedDates(dates: BlockedDate[]): Promise<BlockedDate[]> {
-    return api.put("/doctors/me/blocked-dates", dates);
-  },
-
-  async setVacationMode(is_on_vacation: boolean): Promise<Doctor> {
-    return api.put("/doctors/me/vacation-mode", { is_on_vacation });
-  },
-  
   async getById(id: string): Promise<Doctor> {
     return api.get(`/doctors/${id}`);
   },
@@ -81,19 +76,35 @@ export const doctorsService = {
     return api.post("/doctors/me/qualifications", payload);
   },
 
+  async getMyQualifications(): Promise<Qualification[]> {
+    return api.get("/doctors/me/qualifications");
+  },
+
+  async deleteQualification(id: string): Promise<void> {
+    return api.delete(`/doctors/me/qualifications/${id}`);
+  },
+
   async getAvailability(doctorId: string): Promise<AvailabilitySlot[]> {
     return api.get(`/doctors/${doctorId}/availability`);
   },
-  
-  async getMe(): Promise<Doctor> {
-  return api.get("/doctors/me");
-  },
+
   async setMyAvailability(slots: AvailabilitySlot[]): Promise<AvailabilitySlot[]> {
     return api.put("/doctors/me/availability", slots);
-  }
+  },
+
+  async getBlockedDates(doctorId: string): Promise<BlockedDate[]> {
+    return api.get(`/doctors/${doctorId}/blocked-dates`);
+  },
+
+  async setMyBlockedDates(dates: BlockedDate[]): Promise<BlockedDate[]> {
+    return api.put("/doctors/me/blocked-dates", dates);
+  },
+
+  async setVacationMode(is_on_vacation: boolean): Promise<Doctor> {
+    return api.put("/doctors/me/vacation-mode", { is_on_vacation });
+  },
 };
 
-// Helper used across doctor-facing UI — real name and full location string
 export function doctorFullName(d: Pick<Doctor, "first_name" | "last_name">): string {
   return `Dr. ${d.first_name} ${d.last_name}`;
 }
