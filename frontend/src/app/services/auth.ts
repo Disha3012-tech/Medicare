@@ -27,6 +27,18 @@ export const authService = {
     localStorage.setItem("user_data", JSON.stringify(data.user));
     return data;
   },
+  async changePassword(payload: { current_password: string; new_password: string }): Promise<any> {
+  return api.post("/users/me/change-password", payload);
+},
+
+  async deleteAccount(): Promise<any> {
+  const result = await api.delete("/users/me");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user_role");
+  localStorage.removeItem("user_data");
+  return result;
+},
 
   async register(payload: any): Promise<AuthResponse> {
     const data = await api.post("/auth/register", payload);
@@ -65,9 +77,7 @@ export const authService = {
     return user;
   },
 
-  async changePassword(payload: any): Promise<any> {
-    return api.post("/users/me/change-password", payload);
-  },
+  
 
   getCurrentUser(): User | null {
     const data = localStorage.getItem("user_data");
