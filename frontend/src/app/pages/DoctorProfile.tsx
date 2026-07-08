@@ -239,7 +239,7 @@ export default function DoctorProfile() {
             <div className="sticky top-24 bg-card rounded-2xl border border-border p-6 space-y-5">
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Consultation fee</p>
-                <p className="font-['Fraunces',serif] text-3xl font-semibold text-foreground">${doctor.consultation_fee}</p>
+                <p className="font-['Fraunces',serif] text-3xl font-semibold text-foreground">₹{doctor.consultation_fee}</p>
                 <p className="text-xs text-muted-foreground">per visit</p>
               </div>
 
@@ -264,7 +264,7 @@ export default function DoctorProfile() {
             onClick={() => navigate(`/book/${doctor.id}`)}
             className="w-full bg-primary text-primary-foreground py-3.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-all"
           >
-            Book appointment · ${doctor.consultation_fee}
+            Book appointment · ₹{doctor.consultation_fee}
           </button>
         </div>
         <div className="h-20 lg:hidden" />
