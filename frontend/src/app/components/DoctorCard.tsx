@@ -97,7 +97,7 @@ export default function DoctorCard({ doctor, layout = "grid" }: Props) {
             <p className="text-xs font-medium text-accent mt-0.5">{doctor.years_experience} years</p>
           </div>
           <div className="text-right">
-            <p className="font-['Fraunces',serif] text-xl font-semibold text-foreground">${doctor.consultation_fee}</p>
+            <p className="font-['Fraunces',serif] text-lg font-semibold text-foreground">₹{doctor.consultation_fee}</p>
             <p className="text-xs text-muted-foreground">per visit</p>
           </div>
         </div>

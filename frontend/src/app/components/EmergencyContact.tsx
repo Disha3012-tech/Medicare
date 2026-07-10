@@ -76,7 +76,7 @@ export default function EmergencyContact({ onSave }: { onSave?: () => void }) {
             <select value={form.countryCode} onChange={e => set("countryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
               {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <input value={form.phone} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+            <input value={form.phone} maxLength={10} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, "").slice(0, 10))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
         </div>
         <div className="sm:col-span-2">

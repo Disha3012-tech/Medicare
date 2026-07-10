@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { HeartPulse, ArrowRight, ArrowLeft, CheckCircle2, Plus, X } from "lucide-react";
-import AvatarSelector, { type AvatarId, getAvatarById } from "../components/AvatarSelector";
 import { useAuth } from "../components/AuthProvider";
 import { authService } from "../services/auth";
 import { doctorsService, type AvailabilitySlot } from "../services/doctors";
 
-type Step = 1 | 2 | 3 | 4 ;
+type Step = 1 | 2 | 3 | 4;
 
 const SPECIALTIES = ["Cardiology","Dermatology","Endocrinology","General Practice","Neurology","Orthopedics","Pediatrics","Psychiatry","Radiology","Oncology"];
 const DAYS         = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -22,7 +21,6 @@ const STEP_LABELS: Record<Step, string> = {
   2: "Qualifications",
   3: "Practice Details",
   4: "Availability",
-  
 };
 
 interface FormState {
@@ -32,7 +30,7 @@ interface FormState {
   clinicAddress: string; city: string; state: string;
   consultationFee: string;
   availableDays: string[]; timeSlots: string[];
-  bio: string; avatarId: AvatarId | null;
+  bio: string;
 }
 
 const INITIAL: FormState = {
@@ -43,7 +41,7 @@ const INITIAL: FormState = {
   consultationFee: "",
   availableDays: ["Monday","Tuesday","Wednesday","Thursday","Friday"],
   timeSlots: ["9:00 AM","10:00 AM","11:00 AM","2:00 PM","3:00 PM"],
-  bio: "", avatarId: null,
+  bio: "",
 };
 
 function to24Hour(time12: string): string {
@@ -74,6 +72,26 @@ export default function DoctorProfileSetup() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Pre-fill from any existing doctor profile (e.g. if they clicked "Skip for now" earlier and came back)
+  useEffect(() => {
+    doctorsService.getMe().then(d => {
+      setForm(f => ({
+        ...f,
+        fullName: `${d.first_name} ${d.last_name}`.trim() || f.fullName,
+        specialty: d.specialty || f.specialty,
+        experience: d.years_experience ? String(d.years_experience) : f.experience,
+        hospital: d.clinic_name || f.hospital,
+        clinicAddress: d.clinic_address || f.clinicAddress,
+        city: d.clinic_city || f.city,
+        state: d.clinic_state || f.state,
+        consultationFee: d.consultation_fee ? String(d.consultation_fee) : f.consultationFee,
+        bio: d.bio || f.bio,
+      }));
+    }).catch(() => {
+      // No doctor profile yet — fine, this is a fresh signup
+    });
+  }, []);
+
   const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   function toggleList(field: "availableDays" | "timeSlots", value: string) {
@@ -91,11 +109,10 @@ export default function DoctorProfileSetup() {
     if (step === 1) return !!form.fullName && !!form.gender && !!form.phone;
     if (step === 2) return !!form.specialty && !!form.experience;
     if (step === 3) return !!form.hospital && !!form.consultationFee;
-    
     return true;
   }
 
-  function next() { if (step < 5) setStep((step + 1) as Step); }
+  function next() { if (step < 4) setStep((step + 1) as Step); }
   function back() { if (step > 1) setStep((step - 1) as Step); }
 
   async function finish() {
@@ -123,7 +140,6 @@ export default function DoctorProfileSetup() {
       });
 
       for (const q of form.qualifications) {
-        // Stored as free text — split "Degree, Institution, Year" loosely if possible, else store as degree only
         await doctorsService.addQualification({ degree: q, institution: form.hospital || "Not specified", year: new Date().getFullYear() });
       }
 
@@ -159,12 +175,12 @@ export default function DoctorProfileSetup() {
           <HeartPulse className="w-5 h-5 text-accent" />
           <span className="font-['Fraunces',serif] font-semibold text-primary">Medica</span>
         </div>
-        <p className="text-xs text-muted-foreground">Step {step} of 5 — {STEP_LABELS[step]}</p>
+        <p className="text-xs text-muted-foreground">Step {step} of 4 — {STEP_LABELS[step]}</p>
       </header>
 
       <div className="max-w-xl mx-auto px-4 py-8">
         <div className="flex gap-1.5 mb-8">
-          {([1,2,3,4,5] as Step[]).map(s => (
+          {([1,2,3,4] as Step[]).map(s => (
             <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-muted"}`} />
           ))}
         </div>
@@ -177,7 +193,6 @@ export default function DoctorProfileSetup() {
               {step === 2 && "Your medical qualifications and specialty."}
               {step === 3 && "Where you practice and consultation fees."}
               {step === 4 && "When patients can book appointments with you."}
-            
             </p>
           </div>
 
@@ -193,7 +208,7 @@ export default function DoctorProfileSetup() {
                   <select value={form.countryCode} onChange={e => set("countryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                     {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <input value={form.phone} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <input value={form.phone} maxLength={10} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, "").slice(0, 10))} placeholder="9876543210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
               <div>
@@ -287,8 +302,6 @@ export default function DoctorProfileSetup() {
             </div>
           )}
 
-
-
           {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
 
           <div className="flex gap-3 pt-2">
@@ -297,7 +310,7 @@ export default function DoctorProfileSetup() {
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
             )}
-            {step < 5 ? (
+            {step < 4 ? (
               <button onClick={next} disabled={!canProceed()} className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-xl font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 Continue <ArrowRight className="w-4 h-4" />
               </button>
@@ -307,7 +320,7 @@ export default function DoctorProfileSetup() {
               </button>
             )}
           </div>
-          {step < 5 && (
+          {step < 4 && (
             <button onClick={() => navigate("/doctor")} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center">Skip for now</button>
           )}
         </div>
