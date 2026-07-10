@@ -52,6 +52,7 @@ export const router = createBrowserRouter([
       { path: "doctor/analytics",                        element: <RouteGuard allowedRole="DOCTOR"><DoctorAnalytics /></RouteGuard> },
       { path: "doctor/availability",                     element: <RouteGuard allowedRole="DOCTOR"><DoctorAvailability /></RouteGuard> },
       { path: "doctor/settings",                         element: <RouteGuard allowedRole="DOCTOR"><DoctorSettings /></RouteGuard> },
+      { path: "doctor/notifications",                    element: <RouteGuard allowedRole="DOCTOR"><Notifications /></RouteGuard> },
       { path: "doctor/:id",                              element: <RouteGuard><DoctorProfile /></RouteGuard> },
 
       // Discovery & booking

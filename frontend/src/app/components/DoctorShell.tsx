@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell } from "lucide-react";
+import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell, MessageCircle } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import FloatingAIAssistant from "./FloatingAIAssistant";
@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 const NAV = [
   { path: "/doctor", label: "Schedule", icon: Calendar, exact: true },
   { path: "/doctor/patients", label: "Patients", icon: Users },
+  { path: "/messages", label: "Messages", icon: MessageCircle },
   { path: "/doctor/prescriptions", label: "Prescriptions", icon: Pill },
   { path: "/doctor/analytics", label: "Analytics", icon: BarChart2 },
   { path: "/doctor/availability", label: "Availability", icon: Clock },
@@ -72,6 +73,9 @@ export default function DoctorShell({ title, subtitle, children, actions }: Prop
           ))}
         </nav>
         <div className="p-3 border-t border-border space-y-0.5">
+          <button onClick={() => { navigate("/doctor/notifications"); setOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive("/doctor/notifications") ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+            <Bell className="w-4 h-4" /> Notifications
+          </button>
           <button onClick={() => { navigate("/doctor/settings"); setOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive("/doctor/settings") ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
             <Settings className="w-4 h-4" /> Settings
           </button>

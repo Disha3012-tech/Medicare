@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { HeartPulse, ArrowRight, ArrowLeft, CheckCircle2, Plus, X } from "lucide-react";
-import AvatarSelector, { type AvatarId, getAvatarById } from "../components/AvatarSelector";
 import { useAuth } from "../components/AuthProvider";
 import { authService } from "../services/auth";
 import { patientsService } from "../services/patients";
 
-type Step = 1 | 2 | 3 | 4 ;
+type Step = 1 | 2 | 3 | 4;
 
 const BLOOD_GROUPS = ["A+","A-","B+","B-","O+","O-","AB+","AB-"];
 const ALLERGIES_SUGGESTIONS = ["Penicillin","Aspirin","Ibuprofen","Sulfonamides","Latex","Peanuts","Shellfish","Eggs"];
@@ -18,8 +17,7 @@ const STEP_LABELS: Record<Step, string> = {
   1: "Personal Info",
   2: "Health Metrics",
   3: "Medical History",
-  4: "Emergency & Address",
- 
+  4: "Emergency Contact",
 };
 
 const GENDER_MAP: Record<string, string> = { Male: "MALE", Female: "FEMALE" };
@@ -30,7 +28,6 @@ interface FormState {
   allergies: string[]; diseases: string[];
   emergencyName: string; emergencyRelation: string; emergencyCountryCode: string; emergencyPhone: string;
   address: string; city: string; state: string; zip: string;
-  avatarId: AvatarId | null;
 }
 
 const INITIAL: FormState = {
@@ -39,7 +36,6 @@ const INITIAL: FormState = {
   allergies: [], diseases: [],
   emergencyName: "", emergencyRelation: "", emergencyCountryCode: "+91", emergencyPhone: "",
   address: "", city: "", state: "", zip: "",
-  avatarId: null,
 };
 
 export default function PatientProfileSetup() {
@@ -51,6 +47,31 @@ export default function PatientProfileSetup() {
   const [diseaseInput, setDiseaseInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    patientsService.getMe().then(p => {
+      setForm(f => ({
+        ...f,
+        dob: p.date_of_birth ? p.date_of_birth.slice(0, 10) : f.dob,
+        gender: p.gender === "MALE" ? "Male" : p.gender === "FEMALE" ? "Female" : f.gender,
+        height: p.height != null ? String(p.height) : f.height,
+        weight: p.weight != null ? String(p.weight) : f.weight,
+        bloodGroup: p.blood_group || f.bloodGroup,
+        allergies: p.allergies || f.allergies,
+        diseases: p.chronic_conditions || f.diseases,
+        address: p.address || f.address,
+        city: p.city || f.city,
+        state: p.state || f.state,
+        zip: p.zip_code || f.zip,
+      }));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    authService.getMe().then(u => {
+      setForm(f => ({ ...f, fullName: `${u.first_name} ${u.last_name}`.trim() || f.fullName }));
+    }).catch(() => {});
+  }, []);
 
   const set = (k: keyof FormState, v: any) => setForm(f => ({ ...f, [k]: v }));
 
@@ -69,11 +90,10 @@ export default function PatientProfileSetup() {
   function canProceed(): boolean {
     if (step === 1) return !!form.fullName && !!form.dob && !!form.gender && !!form.phone;
     if (step === 2) return !!form.height && !!form.weight;
-  
     return true;
   }
 
-  function next() { if (step < 5) setStep((step + 1) as Step); }
+  function next() { if (step < 4) setStep((step + 1) as Step); }
   function back() { if (step > 1) setStep((step - 1) as Step); }
 
   async function finish() {
@@ -126,12 +146,12 @@ export default function PatientProfileSetup() {
           <HeartPulse className="w-5 h-5 text-accent" />
           <span className="font-['Fraunces',serif] font-semibold text-primary">Medica</span>
         </div>
-        <p className="text-xs text-muted-foreground">Step {step} of 5 — {STEP_LABELS[step]}</p>
+        <p className="text-xs text-muted-foreground">Step {step} of 4 — {STEP_LABELS[step]}</p>
       </header>
 
       <div className="max-w-xl mx-auto px-4 py-8">
         <div className="flex gap-1.5 mb-8">
-          {([1,2,3,4,5] as Step[]).map(s => (
+          {([1,2,3,4] as Step[]).map(s => (
             <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${s <= step ? "bg-primary" : "bg-muted"}`} />
           ))}
         </div>
@@ -143,8 +163,7 @@ export default function PatientProfileSetup() {
               {step === 1 && "Tell us a little about yourself."}
               {step === 2 && "Your current health measurements."}
               {step === 3 && "Share your medical background so doctors can care for you better."}
-              {step === 4 && "Emergency contact and home address."}
-             
+              {step === 4 && "Who should we contact in case of an emergency?"}
             </p>
           </div>
 
@@ -160,7 +179,7 @@ export default function PatientProfileSetup() {
                   <select value={form.countryCode} onChange={e => set("countryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                     {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <input value={form.phone} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <input value={form.phone} maxLength={10} onChange={e => set("phone", e.target.value.replace(/[^\d]/g, "").slice(0, 10))} placeholder="9876543210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                 </div>
               </div>
               <div>
@@ -173,6 +192,17 @@ export default function PatientProfileSetup() {
                   {(["Male","Female"] as const).map(g => (
                     <button key={g} onClick={() => set("gender", g)} className={`py-3 rounded-xl border-2 text-sm font-medium transition-all ${form.gender === g ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/30"}`}>{g}</button>
                   ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Home address</p>
+                <div className="space-y-3">
+                  <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Street address" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {[["city","City"],["state","State"],["zip","ZIP"]].map(([k, label]) => (
+                      <input key={k} value={(form as any)[k]} onChange={e => set(k as keyof FormState, e.target.value)} placeholder={label} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -271,26 +301,13 @@ export default function PatientProfileSetup() {
                       <select value={form.emergencyCountryCode} onChange={e => set("emergencyCountryCode", e.target.value)} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                         {COUNTRY_CODES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
-                      <input value={form.emergencyPhone} onChange={e => set("emergencyPhone", e.target.value.replace(/[^\d]/g, ""))} placeholder="98765 43210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                      <input value={form.emergencyPhone} maxLength={10} onChange={e => set("emergencyPhone", e.target.value.replace(/[^\d]/g, "").slice(0, 10))} placeholder="9876543210" className="flex-1 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
                     </div>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Home address</p>
-                <div className="space-y-3">
-                  <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Street address" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                  <div className="grid grid-cols-3 gap-2">
-                    {[["city","City"],["state","State"],["zip","ZIP"]].map(([k, label]) => (
-                      <input key={k} value={(form as any)[k]} onChange={e => set(k as keyof FormState, e.target.value)} placeholder={label} className="bg-input-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-                    ))}
                   </div>
                 </div>
               </div>
             </div>
           )}
-
-        
 
           {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
 
@@ -300,7 +317,7 @@ export default function PatientProfileSetup() {
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
             )}
-            {step < 5 ? (
+            {step < 4 ? (
               <button onClick={next} disabled={!canProceed()} className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-xl font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 Continue <ArrowRight className="w-4 h-4" />
               </button>
@@ -311,7 +328,7 @@ export default function PatientProfileSetup() {
             )}
           </div>
 
-          {step < 5 && (
+          {step < 4 && (
             <button onClick={() => navigate("/patient")} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center">
               Skip for now
             </button>
