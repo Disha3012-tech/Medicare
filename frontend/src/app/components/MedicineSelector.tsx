@@ -103,19 +103,28 @@ export default function MedicineSelector({ selected, onChange }: Props) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search medicines…" className="w-full bg-input-background border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
-          {query && suggestions.length > 0 && (
-            <div className="mt-2 bg-card border border-border rounded-xl overflow-hidden shadow-md">
-              {suggestions.map(m => (
-                <button key={m.name} onClick={() => startAdd(m.name, m.defaultDosage)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted transition-colors text-left">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{m.name}</p>
-                    <p className="text-xs text-muted-foreground">{m.category} · {m.defaultDosage}</p>
-                  </div>
-                  <Plus className="w-4 h-4 text-accent" />
-                </button>
-              ))}
-            </div>
-          )}
+          {query && (
+  <div className="mt-2 bg-card border border-border rounded-xl overflow-hidden shadow-md">
+    {suggestions.map(m => (
+      <button key={m.name} onClick={() => startAdd(m.name, m.defaultDosage)} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted transition-colors text-left">
+        <div>
+          <p className="text-sm font-medium text-foreground">{m.name}</p>
+          <p className="text-xs text-muted-foreground">{m.category} · {m.defaultDosage}</p>
+        </div>
+        <Plus className="w-4 h-4 text-accent" />
+      </button>
+    ))}
+    {!selected.some(s => s.name.toLowerCase() === query.toLowerCase()) && (
+      <button onClick={() => startAdd(query.trim(), "")} className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent/5 transition-colors text-left border-t border-border">
+        <div>
+          <p className="text-sm font-medium text-accent">Add "{query.trim()}" as new medicine</p>
+          <p className="text-xs text-muted-foreground">Not in the suggested list — enter details manually</p>
+        </div>
+        <Plus className="w-4 h-4 text-accent" />
+      </button>
+    )}
+  </div>
+)}
         </div>
       )}
     </div>
