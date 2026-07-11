@@ -166,7 +166,7 @@ export default function AppointmentBooking() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Fee</p>
-                <p className="font-medium text-foreground">${doctor.consultation_fee}</p>
+                <p className="font-medium text-foreground">₹{doctor.consultation_fee}</p>
               </div>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function AppointmentBooking() {
           </div>
           <div>
             <p className="font-medium text-foreground">{name}</p>
-            <p className="text-sm text-accent">{doctor.specialty} · ${doctor.consultation_fee}</p>
+            <p className="text-sm text-accent">{doctor.specialty} · ₹{doctor.consultation_fee}</p>
           </div>
           <button onClick={() => navigate(`/doctor/${doctor.id}`)} className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors">Change</button>
         </div>

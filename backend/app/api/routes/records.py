@@ -94,3 +94,33 @@ def delete_record(
     db.delete(record)
     db.commit()
     return {"success": True}
+
+
+@router.get("/{record_id}/download")
+def download_record_file(
+    record_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+
+    # Check authorization: patient owns it, or user is doctor/admin
+    if current_user.role == Role.PATIENT:
+        patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+        if not patient or record.patient_id != patient.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this record")
+    elif current_user.role not in (Role.DOCTOR, Role.ADMIN):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this record")
+
+    file_path = record.file_url.lstrip("/")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on server")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=file_path,
+        filename=record.file_name,
+        media_type="application/octet-stream"
+    )

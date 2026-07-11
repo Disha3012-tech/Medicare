@@ -41,7 +41,7 @@ export default function BookingSummary({
           )}
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="font-['Fraunces',serif] text-xl font-semibold text-foreground">${doctor.consultation_fee}</p>
+          <p className="font-['Fraunces',serif] text-xl font-semibold text-foreground">₹{doctor.consultation_fee}</p>
           <p className="text-xs text-muted-foreground">consultation</p>
         </div>
       </div>

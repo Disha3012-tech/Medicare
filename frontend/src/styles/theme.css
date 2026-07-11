@@ -42,40 +42,60 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  /* ── Surface levels (3-tier depth) ── */
+  --background: #0f1117;        /* page canvas — deepest */
+  --foreground: #e8edf4;        /* primary text */
+
+  --card: #181c25;              /* cards sit above the canvas */
+  --card-foreground: #e8edf4;
+
+  --popover: #1e2330;
+  --popover-foreground: #e8edf4;
+
+  /* ── Brand colours preserved in dark ── */
+  --primary: #2e86ab;           /* brand blue — readable on dark cards */
+  --primary-foreground: #ffffff;
+
+  --secondary: #1e2330;
+  --secondary-foreground: #c5d4e8;
+
+  --muted: #1e2330;
+  --muted-foreground: #8fa8c8;  /* brighter than before — readable */
+
+  --accent: #0a9396;            /* teal stays teal */
+  --accent-foreground: #ffffff;
+
+  /* ── Status colours ── */
+  --destructive: #e05252;
+  --destructive-foreground: #ffffff;
+
+  /* ── Borders & inputs ── */
+  --border: rgba(255,255,255,0.08);
+  --input: #1e2330;
+  --input-background: #1e2330;
+  --switch-background: #3a4a5c;
+  --ring: #0a9396;
+
+  /* ── Typography weights ── */
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+
+  /* ── Charts ── */
+  --chart-1: #2e86ab;
+  --chart-2: #0a9396;
+  --chart-3: #52b788;
+  --chart-4: #a8dadc;
+  --chart-5: #e9c46a;
+
+  /* ── Sidebar (slightly elevated from background) ── */
+  --sidebar: #181c25;
+  --sidebar-foreground: #e8edf4;
+  --sidebar-primary: #2e86ab;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e2330;
+  --sidebar-accent-foreground: #c5d4e8;
+  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-ring: #0a9396;
 }
 
 @theme inline {
@@ -190,5 +210,38 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+
+  /* ── Dark mode polish ── */
+  .dark select option {
+    background: #1e2330;
+    color: #e8edf4;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #8fa8c8;
+    opacity: 1;
+  }
+
+  /* Subtle card separation in dark mode */
+  .dark .bg-card {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Scrollbar styling for dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: #0f1117;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #3a4a5c;
+    border-radius: 99px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #0a9396;
   }
 }
