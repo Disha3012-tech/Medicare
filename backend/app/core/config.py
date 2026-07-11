@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_file_size_mb: int = 10
 
+    # Featherless API credentials (required for AI features)
+    featherless_api_key: str = ""
+    featherless_model: str = "google/gemma-2-9b-it"
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
