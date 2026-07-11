@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { HeartPulse, Eye, EyeOff, User, Stethoscope, ArrowLeft, CheckCircle2, Shield } from "lucide-react";
+import { HeartPulse, Eye, EyeOff, User, Stethoscope, ArrowLeft, CheckCircle2, Shield, Lock } from "lucide-react";
 import { useAuth } from "../components/AuthProvider";
 
 type Role = "patient" | "doctor";
@@ -15,6 +15,11 @@ export default function Auth() {
   const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const pwLen = form.password.length;
+  const pwValid = pwLen >= 8;
+  const pwColor = pwLen === 0 ? "#6b7280" : pwLen < 5 ? "#ef4444" : pwLen < 8 ? "#f59e0b" : "#10b981";
   const { login: performLogin, register: performRegister } = useAuth();
 
   useEffect(() => {
@@ -29,6 +34,8 @@ export default function Auth() {
     setError("");
     if (!form.email || !form.password) { setError("Please fill in all required fields."); return; }
     if (mode === "signup" && !form.name) { setError("Please enter your name."); return; }
+    if (mode === "signup" && !pwValid) { setError("Password must be at least 8 characters."); return; }
+    if (mode === "signup" && !agreedToTerms) { setError("Please agree to the Terms & Conditions to continue."); return; }
     setLoading(true);
     
     try {
@@ -223,7 +230,141 @@ export default function Auth() {
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {/* Password character counter — shown on both login & signup */}
+              {form.password.length > 0 && (
+                <div style={{ marginTop: "10px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      background: pwValid
+                        ? "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.10))"
+                        : pwLen < 5
+                        ? "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(220,38,38,0.08))"
+                        : "linear-gradient(135deg,rgba(245,158,11,0.14),rgba(217,119,6,0.09))",
+                      border: `1.5px solid ${pwValid ? "rgba(16,185,129,0.45)" : pwLen < 5 ? "rgba(239,68,68,0.40)" : "rgba(245,158,11,0.40)"}`,
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    <Lock
+                      style={{
+                        width: "14px",
+                        height: "14px",
+                        color: pwColor,
+                        flexShrink: 0,
+                        transition: "color 0.3s",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        color: pwColor,
+                        fontWeight: 600,
+                        transition: "color 0.3s",
+                        flex: 1,
+                      }}
+                    >
+                      {pwValid
+                        ? "✓ Password length is good!"
+                        : `Must be at least 8 characters — ${pwLen}/8`}
+                    </span>
+                    {/* Mini progress bar */}
+                    <div
+                      style={{
+                        width: "52px",
+                        height: "5px",
+                        borderRadius: "99px",
+                        background: "rgba(128,128,128,0.25)",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          borderRadius: "99px",
+                          background: pwColor,
+                          width: `${Math.min((pwLen / 8) * 100, 100)}%`,
+                          transition: "width 0.25s ease, background 0.3s",
+                        }}
+                      />
+                    </div>
+                    {/* Character count badge */}
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: pwColor,
+                        background: pwValid ? "rgba(16,185,129,0.15)" : "rgba(128,128,128,0.15)",
+                        borderRadius: "6px",
+                        padding: "2px 6px",
+                        flexShrink: 0,
+                        transition: "all 0.3s",
+                      }}
+                    >
+                      {pwLen}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* Terms checkbox — signup only */}
+            {mode === "signup" && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  cursor: "pointer",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: `1.5px solid ${agreedToTerms ? "rgba(99,102,241,0.4)" : "rgba(107,114,128,0.3)"}`,
+                  background: agreedToTerms ? "rgba(99,102,241,0.06)" : "transparent",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {/* Custom checkbox */}
+                <div
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "5px",
+                    border: `2px solid ${agreedToTerms ? "#6366f1" : "#9ca3af"}`,
+                    background: agreedToTerms ? "#6366f1" : "transparent",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    marginTop: "1px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onClick={() => setAgreedToTerms(v => !v)}
+                >
+                  {agreedToTerms && (
+                    <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                      <path d="M1 4.5L4 7.5L10 1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <input
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={e => setAgreedToTerms(e.target.checked)}
+                  style={{ display: "none" }}
+                />
+                <span style={{ fontSize: "12px", color: "var(--color-foreground)", lineHeight: "1.5", opacity: 0.75 }}>
+                  I agree to the{" "}
+                  <span style={{ color: "#818cf8", fontWeight: 600, cursor: "pointer" }}>Terms &amp; Conditions</span>
+                  {" "}and{" "}
+                  <span style={{ color: "#818cf8", fontWeight: 600, cursor: "pointer" }}>Privacy Policy</span>
+                  . I understand my health data is stored securely.
+                </span>
+              </label>
+            )}
 
             {error && (
               <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>
@@ -231,7 +372,7 @@ export default function Auth() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (mode === "signup" && (!pwValid || !agreedToTerms))}
               className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium text-sm hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed mt-1"
             >
               {loading

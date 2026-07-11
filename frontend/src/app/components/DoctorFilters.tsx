@@ -105,7 +105,7 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Max consultation fee</label>
           <span className="font-['DM_Mono',monospace] text-xs font-medium text-foreground">
-            {filters.maxFee >= 500 ? "Any" : `$${filters.maxFee}`}
+            {filters.maxFee >= 500 ? "Any" : `₹${filters.maxFee}`}
           </span>
         </div>
         <input
@@ -118,7 +118,7 @@ export default function DoctorFilters({ filters, onChange, onClose, resultCount 
           className="w-full accent-primary cursor-pointer"
         />
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
-          <span>$100</span><span>$500+</span>
+          <span>₹100</span><span>₹500+</span>
         </div>
       </div>
     </aside>

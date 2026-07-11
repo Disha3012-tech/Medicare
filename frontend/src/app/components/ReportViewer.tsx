@@ -1,19 +1,33 @@
-import { X, Download, ZoomIn, ZoomOut, FileText } from "lucide-react";
-import type { MedicalRecord } from "../data/records";
+import { X, Download } from "lucide-react";
+import type { MedicalRecord } from "../services/records";
+import { downloadFile } from "../utils/download";
+
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 interface Props { record: MedicalRecord; onClose: () => void; }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isImage(fileName: string) {
+  return /\.(png|jpe?g|webp)$/i.test(fileName);
+}
+
 export default function ReportViewer({ record, onClose }: Props) {
+  const fullUrl = `${API_URL}${record.file_url}`;
+  const isImg = isImage(record.file_name);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
-          <div>
-            <h2 className="font-['Fraunces',serif] text-lg font-semibold text-foreground">{record.title}</h2>
-            <p className="text-xs text-muted-foreground">{record.doctor} · {record.date} · {record.size}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-3xl shadow-2xl flex flex-col h-full max-h-[90vh] sm:max-h-[85vh]">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-border flex-shrink-0">
+          <div className="min-w-0 pr-2">
+            <h2 className="font-['Fraunces',serif] text-base sm:text-lg font-semibold text-foreground truncate">{record.title}</h2>
+            <p className="text-xs text-muted-foreground truncate">{formatDate(record.uploaded_at)} · {record.file_name}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" title="Download">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <button onClick={() => downloadFile(`${API_URL}/api/records/${record.id}/download`, record.file_name)} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all" title="Download">
               <Download className="w-4 h-4" />
             </button>
             <button onClick={onClose} className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-all">
@@ -22,50 +36,12 @@ export default function ReportViewer({ record, onClose }: Props) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
-          {/* Simulated document preview */}
-          <div className="bg-white dark:bg-zinc-900 rounded-xl border border-border p-8 shadow-inner min-h-96 font-['Inter',sans-serif]">
-            <div className="border-b border-gray-200 dark:border-zinc-700 pb-4 mb-6 flex items-start justify-between">
-              <div>
-                <p className="font-semibold text-gray-800 dark:text-gray-100 text-lg">{record.hospital ?? "Medica Health Network"}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Medical Report · Confidential</p>
-              </div>
-              <div className="text-right text-xs text-gray-400 dark:text-gray-500">
-                <p>Date: {record.date}</p>
-                <p>Ref: MED-{record.id.toUpperCase()}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Patient</p>
-                <p className="text-sm text-gray-800 dark:text-gray-100">Alex Johnson · DOB: Jun 14, 1990</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Ordering Physician</p>
-                <p className="text-sm text-gray-800 dark:text-gray-100">{record.doctor}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Report Type</p>
-                <p className="text-sm text-gray-800 dark:text-gray-100">{record.type}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Findings & Interpretation</p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{record.description}</p>
-              </div>
-              <div className="pt-4 border-t border-gray-200 dark:border-zinc-700">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Tags / Keywords</p>
-                <div className="flex flex-wrap gap-2">
-                  {record.tags.map(t => (
-                    <span key={t} className="text-xs bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-full">{t}</span>
-                  ))}
-                </div>
-              </div>
-              <div className="pt-4 border-t border-gray-200 dark:border-zinc-700 text-xs text-gray-400 dark:text-gray-500">
-                <p>This document was generated by Medica Health Inc. and is intended solely for the patient named above. Unauthorized disclosure is prohibited under HIPAA.</p>
-              </div>
-            </div>
-          </div>
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-muted/20 flex items-center justify-center">
+          {isImg ? (
+            <img src={fullUrl} alt={record.title} className="max-w-full max-h-[50vh] sm:max-h-[60vh] object-contain rounded-xl shadow-md" />
+          ) : (
+            <iframe src={fullUrl} title={record.title} className="w-full h-full min-h-[50vh] sm:min-h-[60vh] rounded-xl border border-border bg-white" />
+          )}
         </div>
       </div>
     </div>
