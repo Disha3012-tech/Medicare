@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Upload, X, FileText, CheckCircle2, Camera, Loader2 } from "lucide-react";
 import { recordsService, type MedicalRecord } from "../services/records";
+import CameraScanner from "./CameraScanner";
 
 const TYPES: { value: MedicalRecord["type"]; label: string }[] = [
   { value: "LAB_REPORT", label: "Lab Report" },
@@ -13,81 +14,40 @@ const TYPES: { value: MedicalRecord["type"]; label: string }[] = [
 
 interface Props { onClose: () => void; onUploaded: (record: MedicalRecord) => void; }
 
-/** Loads an image file, applies a grayscale + contrast boost to approximate
- *  a "scanned" look, and returns a new File with the processed image. */
-function enhanceScanImage(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas not supported")); return; }
-      ctx.drawImage(img, 0, 0);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      const contrast = 45; // -255..255
-      const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
-      for (let i = 0; i < data.length; i += 4) {
-        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-        const adjusted = factor * (gray - 128) + 128;
-        const clamped = Math.max(0, Math.min(255, adjusted));
-        data[i] = data[i + 1] = data[i + 2] = clamped;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      canvas.toBlob(blob => {
-        URL.revokeObjectURL(url);
-        if (!blob) { reject(new Error("Failed to process image")); return; }
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, "") + "-scan.jpg", { type: "image/jpeg" }));
-      }, "image/jpeg", 0.9);
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
 export default function UploadReport({ onClose, onUploaded }: Props) {
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [type, setType] = useState<MedicalRecord["type"]>("OTHER");
   const [uploading, setUploading] = useState(false);
-  const [processingScan, setProcessingScan] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
+
+  function setSelectedFile(f: File) {
+    setFile(f);
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(f.type.startsWith("image/") ? URL.createObjectURL(f) : null);
+  }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f) { setFile(f); if (!title) setTitle(f.name.replace(/\.[^.]+$/, "")); }
+    if (f) setSelectedFile(f);
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
-    if (f) { setFile(f); if (!title) setTitle(f.name.replace(/\.[^.]+$/, "")); }
+    if (f) setSelectedFile(f);
   }
 
-  async function handleCameraCapture(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
-    if (!f) return;
-    setProcessingScan(true);
-    setError("");
-    try {
-      const enhanced = await enhanceScanImage(f);
-      setFile(enhanced);
-      if (!title) setTitle(`Scan ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`);
-    } catch {
-      setFile(f); // fall back to the raw photo if enhancement fails
-    } finally {
-      setProcessingScan(false);
-    }
+  function handleScanCaptured(f: File) {
+    setSelectedFile(f);
+    if (!title) setTitle(`Scan ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`);
+    setShowScanner(false);
   }
 
   async function submit() {
@@ -106,80 +66,79 @@ export default function UploadReport({ onClose, onUploaded }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-['Fraunces',serif] text-lg font-semibold text-foreground">Upload Report</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-6 space-y-4">
-          {done ? (
-            <div className="text-center py-8">
-              <CheckCircle2 className="w-12 h-12 text-accent mx-auto mb-3" />
-              <p className="font-medium text-foreground">Upload complete!</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                <div
-                  onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={handleDrop}
-                  onClick={() => inputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${dragging ? "border-accent bg-accent/5" : "border-border hover:border-accent/50 hover:bg-muted/30"}`}
-                >
-                  <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFile} />
-                  <Upload className="w-6 h-6 text-muted-foreground mx-auto mb-1.5" />
-                  <p className="text-xs text-muted-foreground">Drag & drop or <span className="text-accent font-medium">browse</span></p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => cameraRef.current?.click()}
-                  disabled={processingScan}
-                  className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-accent/50 hover:bg-muted/30 transition-all flex flex-col items-center justify-center disabled:opacity-60"
-                >
-                  <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCameraCapture} />
-                  {processingScan ? (
-                    <>
-                      <Loader2 className="w-6 h-6 text-accent mx-auto mb-1.5 animate-spin" />
-                      <p className="text-xs text-muted-foreground">Enhancing scan…</p>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-6 h-6 text-muted-foreground mx-auto mb-1.5" />
-                      <p className="text-xs text-muted-foreground">Scan with camera</p>
-                    </>
-                  )}
-                </button>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+            <h2 className="font-['Fraunces',serif] text-lg font-semibold text-foreground">Upload Report</h2>
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X className="w-5 h-5" /></button>
+          </div>
+          <div className="p-6 space-y-4">
+            {done ? (
+              <div className="text-center py-8">
+                <CheckCircle2 className="w-12 h-12 text-accent mx-auto mb-3" />
+                <p className="font-medium text-foreground">Upload complete!</p>
               </div>
-
-              {file && (
-                <div className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
-                  <FileText className="w-4 h-4 text-accent flex-shrink-0" />
-                  <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Report title</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Blood Panel Q2 2026" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Report type</label>
+            ) : (
+              <>
                 <div className="grid grid-cols-2 gap-2">
-                  {TYPES.map(t => (
-                    <button key={t.value} onClick={() => setType(t.value)} className={`text-xs py-2 px-3 rounded-lg border-2 transition-all ${type === t.value ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{t.label}</button>
-                  ))}
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={handleDrop}
+                    onClick={() => inputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${dragging ? "border-accent bg-accent/5" : "border-border hover:border-accent/50 hover:bg-muted/30"}`}
+                  >
+                    <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFile} />
+                    <Upload className="w-6 h-6 text-muted-foreground mx-auto mb-1.5" />
+                    <p className="text-xs text-muted-foreground">Drag & drop or <span className="text-accent font-medium">browse</span></p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowScanner(true)}
+                    className="border-2 border-dashed border-border rounded-xl p-5 text-center hover:border-accent/50 hover:bg-muted/30 transition-all flex flex-col items-center justify-center"
+                  >
+                    <Camera className="w-6 h-6 text-muted-foreground mx-auto mb-1.5" />
+                    <p className="text-xs text-muted-foreground">Scan with camera</p>
+                  </button>
                 </div>
-              </div>
-              {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
-              <button onClick={submit} disabled={!title || !file || uploading} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</> : <><Upload className="w-4 h-4" /> Upload report</>}
-              </button>
-            </>
-          )}
+
+                {file && (
+                  <div className="flex items-center gap-3 bg-muted/40 rounded-lg px-3 py-2">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-accent flex-shrink-0" />
+                    )}
+                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Report title</label>
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Blood Panel Q2 2026" className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Report type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TYPES.map(t => (
+                      <button key={t.value} onClick={() => setType(t.value)} className={`text-xs py-2 px-3 rounded-lg border-2 transition-all ${type === t.value ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{t.label}</button>
+                    ))}
+                  </div>
+                </div>
+                {error && <p className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2.5">{error}</p>}
+                <button onClick={submit} disabled={!title || !file || uploading} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                  {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</> : <><Upload className="w-4 h-4" /> Upload report</>}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {showScanner && (
+        <CameraScanner onCapture={handleScanCaptured} onClose={() => setShowScanner(false)} />
+      )}
+    </>
   );
 }

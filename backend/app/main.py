@@ -11,7 +11,8 @@ from app.core.database import Base, engine
 from app.models import models  # noqa: F401 - ensures models are registered on Base
 
 from app.api.routes import (
-    auth, users, doctors, patients, appointments, prescriptions, records, messages, notifications, reviews, websocket
+    auth, users, doctors, patients, appointments, prescriptions, records, messages, notifications, reviews, websocket,
+    symptom_checker
 )
 
 os.makedirs(settings.upload_dir, exist_ok=True)
@@ -38,6 +39,7 @@ app.include_router(records.router, prefix="/api")
 app.include_router(messages.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(reviews.router, prefix="/api")
+app.include_router(symptom_checker.router, prefix="/api")
 app.include_router(websocket.router)  # ws endpoints stay at root, not under /api
 
 
