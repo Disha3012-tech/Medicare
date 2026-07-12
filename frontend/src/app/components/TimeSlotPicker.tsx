@@ -1,10 +1,12 @@
 import { Video, Building2, Sun, Sunset, Moon } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import type { AvailabilitySlot } from "../services/doctors";
 
 interface Props {
   date: Date;
-  slots: AvailabilitySlot[]; // doctor's weekly availability, from getAvailability()
+  slots: AvailabilitySlot[];
+  bookedCounts: Record<string, number>; // "HH:MM" (24h) -> count
+  capacity: number;
   appointmentType: "in-person" | "video";
   onTypeChange: (type: "in-person" | "video") => void;
   selectedSlot: { time: string; slotMinutes: number } | null;
@@ -17,46 +19,55 @@ function to12Hour(hour: number, minute: number): string {
   return `${h}:${minute.toString().padStart(2, "0")} ${period}`;
 }
 
-/** Generates ["9:00 AM", "9:30 AM", ...] between start_time and end_time at slot_minutes steps */
-function generateTimes(startTime: string, endTime: string, stepMin: number): string[] {
+function to24Key(hour: number, minute: number): string {
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}
+
+function generateTimes(startTime: string, endTime: string, stepMin: number): { label: string; key24: string; hour: number; minute: number }[] {
   const [startH, startM] = startTime.split(":").map(Number);
   const [endH, endM] = endTime.split(":").map(Number);
-  const times: string[] = [];
+  const times: { label: string; key24: string; hour: number; minute: number }[] = [];
   let mins = startH * 60 + startM;
   const endMins = endH * 60 + endM;
   while (mins < endMins) {
-    times.push(to12Hour(Math.floor(mins / 60), mins % 60));
+    const h = Math.floor(mins / 60), m = mins % 60;
+    times.push({ label: to12Hour(h, m), key24: to24Key(h, m), hour: h, minute: m });
     mins += stepMin;
   }
   return times;
 }
 
-function bucket(time: string): "morning" | "afternoon" | "evening" {
-  const isPM = time.includes("PM");
-  const hour = parseInt(time.split(":")[0], 10);
-  const hour24 = isPM && hour !== 12 ? hour + 12 : (!isPM && hour === 12 ? 0 : hour);
-  if (hour24 < 12) return "morning";
-  if (hour24 < 17) return "afternoon";
+function bucket(hour: number): "morning" | "afternoon" | "evening" {
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
   return "evening";
 }
 
-export default function TimeSlotPicker({ date, slots, appointmentType, onTypeChange, selectedSlot, onSelect }: Props) {
+export default function TimeSlotPicker({ date, slots, bookedCounts, capacity, appointmentType, onTypeChange, selectedSlot, onSelect }: Props) {
   const dayOfWeek = date.getDay();
   const daySlots = slots.filter(s => s.day_of_week === dayOfWeek && s.is_active !== false);
+  const now = new Date();
+  const todaySelected = isToday(date);
 
-  const allTimes: { time: string; slotMinutes: number }[] = daySlots.flatMap(s =>
-    generateTimes(s.start_time, s.end_time, s.slot_minutes || 30).map(time => ({ time, slotMinutes: s.slot_minutes || 30 }))
-  );
+  const allTimes = daySlots.flatMap(s =>
+    generateTimes(s.start_time, s.end_time, s.slot_minutes || 30).map(t => ({ ...t, slotMinutes: s.slot_minutes || 30 }))
+  ).filter(t => {
+    // Drop times that have already passed if the selected date is today
+    if (!todaySelected) return true;
+    const slotDateTime = new Date(date);
+    slotDateTime.setHours(t.hour, t.minute, 0, 0);
+    return slotDateTime > now;
+  });
 
-  const groups: Record<"morning" | "afternoon" | "evening", { time: string; slotMinutes: number }[]> = {
-    morning: [], afternoon: [], evening: [],
-  };
-  allTimes.forEach(t => groups[bucket(t.time)].push(t));
+  const groups: Record<"morning" | "afternoon" | "evening", typeof allTimes> = { morning: [], afternoon: [], evening: [] };
+  allTimes.forEach(t => groups[bucket(t.hour)].push(t));
 
   if (allTimes.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-6 text-center">
-        This doctor has no availability set for {format(date, "EEEE")}s. Please choose a different date.
+        {todaySelected
+          ? "No more slots available today. Please choose a different date."
+          : `This doctor has no availability set for ${format(date, "EEEE")}s. Please choose a different date.`}
       </p>
     );
   }
@@ -95,20 +106,33 @@ export default function TimeSlotPicker({ date, slots, appointmentType, onTypeCha
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {items.map(slot => (
-                <button
-                  key={slot.time}
-                  onClick={() => onSelect(slot)}
-                  className={[
-                    "py-2.5 rounded-lg text-xs font-medium border-2 transition-all",
-                    selectedSlot?.time === slot.time
-                      ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/15"
-                      : "border-border text-foreground hover:border-accent/50 hover:bg-accent/5",
-                  ].join(" ")}
-                >
-                  {slot.time}
-                </button>
-              ))}
+              {items.map(t => {
+                const bookedCount = bookedCounts[t.key24] || 0;
+                const spotsLeft = capacity - bookedCount;
+                const full = spotsLeft <= 0;
+                const isSelected = selectedSlot?.time === t.label;
+                return (
+                  <button
+                    key={t.key24}
+                    disabled={full}
+                    onClick={() => !full && onSelect({ time: t.label, slotMinutes: t.slotMinutes })}
+                    className={[
+                      "py-2.5 rounded-lg text-xs font-medium border-2 transition-all relative",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground shadow-md shadow-primary/15"
+                        : full
+                        ? "border-border/50 text-muted-foreground/40 cursor-not-allowed bg-muted/30"
+                        : "border-border text-foreground hover:border-accent/50 hover:bg-accent/5",
+                    ].join(" ")}
+                  >
+                    {t.label}
+                    {!full && capacity > 2 && (
+                      <span className="block text-[10px] opacity-70 mt-0.5">{spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} left</span>
+                    )}
+                    {full && <span className="block text-[10px] mt-0.5">Full</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
         );

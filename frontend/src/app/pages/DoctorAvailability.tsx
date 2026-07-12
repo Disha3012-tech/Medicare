@@ -111,6 +111,7 @@ export default function DoctorAvailability() {
   const { doctorProfile, refreshUser } = useAuth();
   const [schedule, setSchedule] = useState<WeekSchedule>(EMPTY_SCHEDULE);
   const [vacationMode, setVacationMode] = useState(false);
+  const [slotCapacity, setSlotCapacity] = useState(1);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [viewMonth, setViewMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
@@ -127,6 +128,7 @@ export default function DoctorAvailability() {
         setSchedule(slotsToSchedule(slots));
         setBlockedDates(blocked.map(b => b.date.slice(0, 10)));
         setVacationMode(doctorProfile.is_on_vacation ?? false);
+        setSlotCapacity(doctorProfile.slot_capacity ?? 2);
       })
       .catch(err => addToast({ type: "error", title: "Failed to load availability", body: err.message }))
       .finally(() => setLoading(false));
@@ -147,6 +149,7 @@ export default function DoctorAvailability() {
         doctorsService.setMyAvailability(slots),
         doctorsService.setMyBlockedDates(blockedDates.map(date => ({ date }))),
         doctorsService.setVacationMode(vacationMode),
+        doctorsService.updateMe({ slot_capacity: slotCapacity }),
       ]);
       await refreshUser();
       addToast({ type: "success", title: "Availability saved", body: "Your schedule has been updated successfully." });
@@ -199,6 +202,20 @@ export default function DoctorAvailability() {
           >
             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm ${vacationMode ? "left-5" : "left-1"}`} />
           </div>
+        </div>
+
+        <div className="bg-card rounded-xl border border-border p-5 flex items-center justify-between">
+          <div>
+            <p className="font-medium text-foreground text-sm">Patients per time slot</p>
+            <p className="text-xs text-muted-foreground">How many patients can book the same time slot (e.g. for group or overlapping consultations)</p>
+          </div>
+          <select
+            value={slotCapacity}
+            onChange={e => setSlotCapacity(Number(e.target.value))}
+            className="bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
         </div>
 
         {!vacationMode && (

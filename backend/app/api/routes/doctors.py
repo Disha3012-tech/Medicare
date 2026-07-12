@@ -40,10 +40,29 @@ def _serialize_doctor(doctor: Doctor) -> DoctorOut:
         last_name=doctor.user.last_name,
         avatar_url=doctor.user.avatar_url,
         is_on_vacation=doctor.is_on_vacation,
+        slot_capacity=doctor.slot_capacity,
     )
 from app.schemas.doctor import QualificationOut
 
+from typing import Dict
+from datetime import datetime, timedelta
 
+@router.get("/{doctor_id}/slot-bookings", response_model=Dict[str, int])
+def get_slot_bookings(doctor_id: str, date: str, db: Session = Depends(get_db)):
+    """Returns { 'HH:MM': count } of active bookings per exact time, for a given date."""
+    day_start = datetime.strptime(date, "%Y-%m-%d")
+    day_end = day_start + timedelta(days=1)
+    appts = db.query(Appointment).filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.status.in_([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
+        Appointment.scheduled_at >= day_start,
+        Appointment.scheduled_at < day_end,
+    ).all()
+    counts: Dict[str, int] = {}
+    for a in appts:
+        key = a.scheduled_at.strftime("%H:%M")
+        counts[key] = counts.get(key, 0) + 2
+    return counts
 @router.get("/me/qualifications", response_model=List[QualificationOut])
 def list_my_qualifications(
     current_user: User = Depends(require_roles(Role.DOCTOR)),

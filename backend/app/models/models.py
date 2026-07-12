@@ -175,6 +175,7 @@ class Doctor(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_on_vacation = Column(Boolean, default=False)
+    slot_capacity = Column(Integer, default=2)
     user = relationship("User", back_populates="doctor_profile")
     qualifications = relationship("Qualification", back_populates="doctor", cascade="all, delete")
     availability = relationship("AvailabilitySlot", back_populates="doctor", cascade="all, delete")

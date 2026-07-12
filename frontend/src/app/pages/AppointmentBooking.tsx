@@ -54,6 +54,7 @@ export default function AppointmentBooking() {
   const [loading, setLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [bookedCounts, setBookedCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -68,9 +69,23 @@ export default function AppointmentBooking() {
   }, [id]);
 
   useEffect(() => {
-    if (selectedDate) setStep(2);
-  }, []);
-
+    if (selectedDate) {
+    setStep(2);
+    // Fetch booked counts for this date
+    if (id) {
+      doctorsService.getSlotBookings(id, selectedDate.toISOString().split("T")[0])
+        .then(setBookedCounts)
+        .catch(() => setBookedCounts({}));
+    }
+  }
+  }, [selectedDate, id]);
+useEffect(() => {
+  if (!selectedDate || !doctor) return;
+  const dateStr = selectedDate.toISOString().slice(0, 10);
+  doctorsService.getSlotBookings(doctor.id, dateStr)
+    .then(setBookedCounts)
+    .catch(() => setBookedCounts({}));
+}, [selectedDate, doctor]);
   if (loadingDoctor) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center font-['Inter',sans-serif]">
@@ -257,11 +272,14 @@ export default function AppointmentBooking() {
                 <TimeSlotPicker
                   date={selectedDate}
                   slots={availability}
+                  bookedCounts={bookedCounts}
+                  capacity={doctor.slot_capacity}
                   appointmentType={appointmentType}
                   onTypeChange={setAppointmentType}
                   selectedSlot={selectedSlot}
                   onSelect={setSelectedSlot}
                 />
+                
               </div>
               {selectedSlot && (
                 <button
