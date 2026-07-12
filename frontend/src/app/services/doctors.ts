@@ -41,6 +41,7 @@ export interface Doctor {
   last_name: string;
   avatar_url?: string;
   is_on_vacation: boolean;
+  slot_capacity: number;
 }
 
 export const doctorsService = {
@@ -63,7 +64,10 @@ export const doctorsService = {
   async getMe(): Promise<Doctor> {
     return api.get("/doctors/me");
   },
-
+  
+  async getSlotBookings(doctorId: string, dateStr: string): Promise<Record<string, number>> {
+  return api.get(`/doctors/${doctorId}/slot-bookings`, { params: { date: dateStr } });
+  },
   async getById(id: string): Promise<Doctor> {
     return api.get(`/doctors/${id}`);
   },

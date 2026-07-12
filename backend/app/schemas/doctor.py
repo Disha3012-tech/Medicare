@@ -62,7 +62,7 @@ class DoctorUpdate(BaseModel):
     clinic_address: Optional[str] = None
     clinic_city: Optional[str] = None
     clinic_state: Optional[str] = None
-
+    slot_capacity: Optional[int] = None
 
 class DoctorOut(BaseModel):
     id: str
@@ -83,6 +83,7 @@ class DoctorOut(BaseModel):
     last_name: str
     avatar_url: Optional[str] = None
     is_on_vacation: bool = False
+    slot_capacity: int = 2
 
     class Config:
         from_attributes = True

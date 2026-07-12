@@ -46,15 +46,13 @@ async def book_appointment(
     if blocked:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This date is unavailable")
 
-    window_end = payload.scheduled_at + timedelta(minutes=payload.duration_min)
-    conflict = db.query(Appointment).filter(
+    same_slot_count = db.query(Appointment).filter(
         Appointment.doctor_id == doctor.id,
         Appointment.status.in_([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
-        Appointment.scheduled_at < window_end,
-        Appointment.scheduled_at + timedelta(minutes=1) * Appointment.duration_min > payload.scheduled_at,
-    ).first()
-    if conflict:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This slot is no longer available")
+        Appointment.scheduled_at == payload.scheduled_at,
+    ).count()
+    if same_slot_count >= (doctor.slot_capacity or 2):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This slot is fully booked")
 
     appointment = Appointment(
         patient_id=patient.id,
