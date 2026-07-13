@@ -1,13 +1,15 @@
-import { Calendar, Clock, MapPin, Video, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Calendar, Clock, MapPin, Video, ChevronDown, ChevronUp, FileText, Star, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import type { Appointment } from "../services/appointments";
 import AppointmentStatusBadge from "./AppointmentStatusBadge";
 
 interface Props {
   appt: Appointment;
+  reviewed?: boolean;
   onReschedule?: (id: string) => void;
   onCancel?: (id: string) => void;
   onViewDetails?: (id: string) => void;
+  onLeaveReview?: (id: string) => void;
 }
 
 function formatDate(iso: string) {
@@ -17,11 +19,11 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export default function AppointmentCard({ appt, onReschedule, onCancel, onViewDetails }: Props) {
+export default function AppointmentCard({ appt, reviewed, onReschedule, onCancel, onViewDetails, onLeaveReview }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isUpcoming = ["PENDING", "CONFIRMED"].includes(appt.status) && new Date(appt.scheduled_at) > new Date();
+  const isCompleted = appt.status === "COMPLETED";
 
-  // Map backend status to display badge
   const statusMap: Record<string, "upcoming" | "completed" | "cancelled"> = {
     PENDING: "upcoming",
     CONFIRMED: "upcoming",
@@ -69,6 +71,17 @@ export default function AppointmentCard({ appt, onReschedule, onCancel, onViewDe
                   Cancel
                 </button>
               </>
+            )}
+            {isCompleted && (
+              reviewed ? (
+                <span className="flex items-center gap-1 text-xs text-accent">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Review submitted
+                </span>
+              ) : (
+                <button onClick={() => onLeaveReview?.(appt.id)} className="flex items-center gap-1 text-xs text-primary border border-primary/30 rounded-lg px-3 py-1.5 hover:bg-primary/5 transition-colors">
+                  <Star className="w-3.5 h-3.5" /> Leave a review
+                </button>
+              )
             )}
           </div>
         </div>

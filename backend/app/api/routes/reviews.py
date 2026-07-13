@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.models.models import Review, Appointment, Doctor, Patient, User, Role, AppointmentStatus
-from app.schemas.review import ReviewCreate, ReviewOut
+from app.schemas.review import ReviewCreate, ReviewOut, ReviewAnonymizedOut
 from app.core.deps import require_roles
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
@@ -65,6 +65,28 @@ def create_review(
     db.commit()
     db.refresh(review)
     return _serialize_review(review, db)
+
+
+@router.get("/mine", response_model=List[ReviewOut])
+def list_my_reviews(
+    current_user: User = Depends(require_roles(Role.PATIENT)),
+    db: Session = Depends(get_db),
+):
+    patient = db.query(Patient).filter(Patient.user_id == current_user.id).first()
+    reviews = db.query(Review).filter(Review.patient_id == patient.id).order_by(Review.created_at.desc()).all()
+    return [_serialize_review(r, db) for r in reviews]
+
+
+@router.get("/mine/anonymized", response_model=List[ReviewAnonymizedOut])
+def list_my_reviews_anonymized(
+    current_user: User = Depends(require_roles(Role.DOCTOR)),
+    db: Session = Depends(get_db),
+):
+    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    if not doctor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+    reviews = db.query(Review).filter(Review.doctor_id == doctor.id).order_by(Review.created_at.desc()).all()
+    return reviews
 
 
 @router.get("/doctor/{doctor_id}", response_model=List[ReviewOut])

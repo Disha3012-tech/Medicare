@@ -24,7 +24,7 @@ import PatientProfileSetup from "./pages/PatientProfileSetup";
 import DoctorProfileSetup from "./pages/DoctorProfileSetup";
 import Messaging from "./pages/Messaging";
 import { RouteGuard } from "./components/RouteGuard";
-
+import DoctorReviews from "./pages/DoctorReviews";
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -53,8 +53,8 @@ export const router = createBrowserRouter([
       { path: "doctor/availability",                     element: <RouteGuard allowedRole="DOCTOR"><DoctorAvailability /></RouteGuard> },
       { path: "doctor/settings",                         element: <RouteGuard allowedRole="DOCTOR"><DoctorSettings /></RouteGuard> },
       { path: "doctor/notifications",                    element: <RouteGuard allowedRole="DOCTOR"><Notifications /></RouteGuard> },
+      { path: "doctor/reviews",                          element: <RouteGuard allowedRole="DOCTOR"><DoctorReviews /></RouteGuard> },
       { path: "doctor/:id",                              element: <RouteGuard><DoctorProfile /></RouteGuard> },
-
       // Discovery & booking
       { path: "find-doctors",                            element: <RouteGuard allowedRole="PATIENT"><FindDoctors /></RouteGuard> },
       { path: "book/:id",                                element: <RouteGuard allowedRole="PATIENT"><AppointmentBooking /></RouteGuard> },

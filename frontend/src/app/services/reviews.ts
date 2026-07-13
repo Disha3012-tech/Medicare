@@ -10,6 +10,12 @@ export interface Review {
   created_at: string;
   patient_name?: string; // added manually on front-end if needed
 }
+export interface AnonymizedReview {
+  id: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
 
 export const reviewsService = {
   async submit(payload: { appointment_id: string; rating: number; comment?: string }): Promise<Review> {
@@ -18,5 +24,13 @@ export const reviewsService = {
 
   async getByDoctorId(doctorId: string): Promise<Review[]> {
     return api.get(`/reviews/doctor/${doctorId}`);
-  }
+  },
+
+  async getMine(): Promise<Review[]> {
+  return api.get("/reviews/mine");
+},
+
+  async getMineAnonymized(): Promise<AnonymizedReview[]> {
+  return api.get("/reviews/mine/anonymized");
+}
 };
