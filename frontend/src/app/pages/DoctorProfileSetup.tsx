@@ -4,10 +4,10 @@ import { HeartPulse, ArrowRight, ArrowLeft, CheckCircle2, Plus, X } from "lucide
 import { useAuth } from "../components/AuthProvider";
 import { authService } from "../services/auth";
 import { doctorsService, type AvailabilitySlot } from "../services/doctors";
+import { SPECIALTIES, OTHERS_VALUE, resolveSpecialtySelection, resolveSpecialtyForSubmit } from "../services/specialties";
 
 type Step = 1 | 2 | 3 | 4;
 
-const SPECIALTIES = ["Cardiology","Dermatology","Endocrinology","General Practice","Neurology","Orthopedics","Pediatrics","Psychiatry","Radiology","Oncology"];
 const DAYS         = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const TIME_SLOTS   = ["8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM"];
 const COUNTRY_CODES = ["+91","+1","+44","+61","+971","+65"];
@@ -25,7 +25,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 interface FormState {
   fullName: string; countryCode: string; phone: string; gender: "Male" | "Female" | "";
-  specialty: string; experience: string;
+  specialty: string; customSpecialty: string; experience: string;
   qualifications: string[]; hospital: string;
   clinicAddress: string; city: string; state: string;
   consultationFee: string;
@@ -35,7 +35,7 @@ interface FormState {
 
 const INITIAL: FormState = {
   fullName: "", countryCode: "+91", phone: "", gender: "",
-  specialty: "", experience: "",
+  specialty: "", customSpecialty: "", experience: "",
   qualifications: [], hospital: "",
   clinicAddress: "", city: "", state: "",
   consultationFee: "",
@@ -75,10 +75,12 @@ export default function DoctorProfileSetup() {
   // Pre-fill from any existing doctor profile (e.g. if they clicked "Skip for now" earlier and came back)
   useEffect(() => {
     doctorsService.getMe().then(d => {
+      const { selected, customText } = resolveSpecialtySelection(d.specialty);
       setForm(f => ({
         ...f,
         fullName: `${d.first_name} ${d.last_name}`.trim() || f.fullName,
-        specialty: d.specialty || f.specialty,
+        specialty: selected || f.specialty,
+        customSpecialty: customText,
         experience: d.years_experience ? String(d.years_experience) : f.experience,
         hospital: d.clinic_name || f.hospital,
         clinicAddress: d.clinic_address || f.clinicAddress,
@@ -107,7 +109,11 @@ export default function DoctorProfileSetup() {
 
   function canProceed(): boolean {
     if (step === 1) return !!form.fullName && !!form.gender && !!form.phone;
-    if (step === 2) return !!form.specialty && !!form.experience;
+    if (step === 2) {
+      if (!form.specialty || !form.experience) return false;
+      if (form.specialty === OTHERS_VALUE && !form.customSpecialty.trim()) return false;
+      return true;
+    }
     if (step === 3) return !!form.hospital && !!form.consultationFee;
     return true;
   }
@@ -129,7 +135,7 @@ export default function DoctorProfileSetup() {
       });
 
       await doctorsService.updateMe({
-        specialty: form.specialty,
+        specialty: resolveSpecialtyForSubmit(form.specialty, form.customSpecialty),
         years_experience: Number(form.experience) || 0,
         bio: form.bio || undefined,
         consultation_fee: Number(form.consultationFee) || 0,
@@ -228,9 +234,18 @@ export default function DoctorProfileSetup() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">Medical specialty *</label>
                 <div className="grid grid-cols-2 gap-2">
                   {SPECIALTIES.map(s => (
-                    <button key={s} onClick={() => set("specialty", s)} className={`text-sm px-3 py-2.5 rounded-xl border-2 transition-all text-left ${form.specialty === s ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{s}</button>
+                    <button key={s} onClick={() => { set("specialty", s); set("customSpecialty", ""); }} className={`text-sm px-3 py-2.5 rounded-xl border-2 transition-all text-left ${form.specialty === s ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>{s}</button>
                   ))}
+                  <button onClick={() => set("specialty", OTHERS_VALUE)} className={`text-sm px-3 py-2.5 rounded-xl border-2 transition-all text-left ${form.specialty === OTHERS_VALUE ? "border-primary bg-primary/5 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/30"}`}>Others</button>
                 </div>
+                {form.specialty === OTHERS_VALUE && (
+                  <input
+                    value={form.customSpecialty}
+                    onChange={e => set("customSpecialty", e.target.value)}
+                    placeholder="Enter your specialty"
+                    className="w-full mt-2 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Years of experience *</label>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { HeartPulse, Eye, EyeOff, User, Stethoscope, ArrowLeft, CheckCircle2, Shield, Lock } from "lucide-react";
 import { useAuth } from "../components/AuthProvider";
+import { SPECIALTIES, OTHERS_VALUE, resolveSpecialtyForSubmit } from "../services/specialties";
 
 type Role = "patient" | "doctor";
 type Mode = "login" | "signup";
@@ -12,7 +13,7 @@ export default function Auth() {
   const [mode, setMode] = useState<Mode>((params.get("mode") as Mode) || "login");
   const [role, setRole] = useState<Role>((params.get("role") as Role) || "patient");
   const [showPass, setShowPass] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "", customSpecialty: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -36,8 +37,12 @@ export default function Auth() {
     if (mode === "signup" && !form.name) { setError("Please enter your name."); return; }
     if (mode === "signup" && !pwValid) { setError("Password must be at least 8 characters."); return; }
     if (mode === "signup" && !agreedToTerms) { setError("Please agree to the Terms & Conditions to continue."); return; }
+    if (mode === "signup" && role === "doctor" && form.specialty === OTHERS_VALUE && !form.customSpecialty.trim()) {
+      setError("Please enter your specialty.");
+      return;
+    }
     setLoading(true);
-    
+
     try {
       if (mode === "signup") {
         const [first_name = "", ...lastNameParts] = form.name.trim().split(/\s+/);
@@ -51,10 +56,11 @@ export default function Auth() {
           role: role.toUpperCase(),
         });
 
-        if (role === "doctor" && form.specialty) {
+        const finalSpecialty = resolveSpecialtyForSubmit(form.specialty, form.customSpecialty);
+        if (role === "doctor" && finalSpecialty) {
           const { doctorsService } = await import("../services/doctors");
           try {
-            await doctorsService.updateMe({ specialty: form.specialty });
+            await doctorsService.updateMe({ specialty: finalSpecialty });
           } catch (err) {
             console.error("Failed to update specialty after signup:", err);
           }
@@ -185,14 +191,24 @@ export default function Auth() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">Specialty</label>
                 <select
                   value={form.specialty}
-                  onChange={e => setForm(f => ({ ...f, specialty: e.target.value }))}
+                  onChange={e => setForm(f => ({ ...f, specialty: e.target.value, customSpecialty: e.target.value === OTHERS_VALUE ? f.customSpecialty : "" }))}
                   className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                 >
                   <option value="">Select your specialty</option>
-                  {["Cardiology","Dermatology","Endocrinology","General Practice","Neurology","Orthopedics","Pediatrics","Psychiatry"].map(s => (
+                  {SPECIALTIES.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
+                  <option value={OTHERS_VALUE}>Others</option>
                 </select>
+                {form.specialty === OTHERS_VALUE && (
+                  <input
+                    type="text"
+                    placeholder="Enter your specialty"
+                    value={form.customSpecialty}
+                    onChange={e => setForm(f => ({ ...f, customSpecialty: e.target.value }))}
+                    className="w-full mt-2 bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                  />
+                )}
               </div>
             )}
 

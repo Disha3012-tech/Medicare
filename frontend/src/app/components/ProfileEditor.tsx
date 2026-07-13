@@ -3,8 +3,8 @@ import { Save, Loader2 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import { authService } from "../services/auth";
 import { doctorsService } from "../services/doctors";
+import { SPECIALTIES, OTHERS_VALUE, resolveSpecialtySelection, resolveSpecialtyForSubmit } from "../services/specialties";
 
-const SPECIALTIES = ["Cardiology","Dermatology","Endocrinology","General Practice","Neurology","Orthopedics","Pediatrics","Psychiatry"];
 const COUNTRY_CODES = ["+91","+1","+44","+61","+971","+65"];
 
 function splitPhone(full?: string | null): { code: string; number: string } {
@@ -20,19 +20,21 @@ export default function ProfileEditor({ onSave }: { onSave?: () => void }) {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     firstName: "", lastName: "", countryCode: "+91", phone: "", email: "",
-    specialty: "", experience: "", bio: "", consultationFee: "",
+    specialty: "", customSpecialty: "", experience: "", bio: "", consultationFee: "",
   });
 
   useEffect(() => {
     if (!user) return;
     const { code, number } = splitPhone(user.phone);
+    const { selected, customText } = resolveSpecialtySelection(doctorProfile?.specialty);
     setForm({
       firstName: user.first_name,
       lastName: user.last_name,
       countryCode: code,
       phone: number,
       email: user.email,
-      specialty: doctorProfile?.specialty || "",
+      specialty: selected,
+      customSpecialty: customText,
       experience: doctorProfile ? String(doctorProfile.years_experience) : "",
       bio: doctorProfile?.bio || "",
       consultationFee: doctorProfile ? String(doctorProfile.consultation_fee) : "",
@@ -43,6 +45,10 @@ export default function ProfileEditor({ onSave }: { onSave?: () => void }) {
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   async function handleSave() {
+    if (form.specialty === OTHERS_VALUE && !form.customSpecialty.trim()) {
+      setError("Please enter your specialty.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -51,8 +57,9 @@ export default function ProfileEditor({ onSave }: { onSave?: () => void }) {
         last_name: form.lastName,
         phone: `${form.countryCode} ${form.phone}`,
       });
+      const finalSpecialty = resolveSpecialtyForSubmit(form.specialty, form.customSpecialty);
       await doctorsService.updateMe({
-        specialty: form.specialty || undefined,
+        specialty: finalSpecialty || undefined,
         years_experience: form.experience ? Number(form.experience) : undefined,
         bio: form.bio || undefined,
         consultation_fee: form.consultationFee ? Number(form.consultationFee) : undefined,
@@ -108,8 +115,18 @@ export default function ProfileEditor({ onSave }: { onSave?: () => void }) {
           <label className="block text-sm font-medium text-foreground mb-1.5">Specialty</label>
           <select value={form.specialty} onChange={e => set("specialty", e.target.value)} className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
             <option value="">Select…</option>
-            {SPECIALTIES.map(s => <option key={s}>{s}</option>)}
+            {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
+            <option value={OTHERS_VALUE}>Others</option>
           </select>
+          {form.specialty === OTHERS_VALUE && (
+            <input
+              type="text"
+              placeholder="Enter your specialty"
+              value={form.customSpecialty}
+              onChange={e => set("customSpecialty", e.target.value)}
+              className="w-full mt-2 bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">Years of experience</label>
