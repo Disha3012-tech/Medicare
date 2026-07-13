@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router";
-import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell, MessageCircle } from "lucide-react";
+import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell, MessageCircle, Star } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import FloatingAIAssistant from "./FloatingAIAssistant";
@@ -11,6 +11,7 @@ const NAV = [
   { path: "/doctor/patients", label: "Patients", icon: Users },
   { path: "/messages", label: "Messages", icon: MessageCircle },
   { path: "/doctor/prescriptions", label: "Prescriptions", icon: Pill },
+  { path: "/doctor/reviews", label: "Reviews", icon: Star },
   { path: "/doctor/analytics", label: "Analytics", icon: BarChart2 },
   { path: "/doctor/availability", label: "Availability", icon: Clock },
 ];
