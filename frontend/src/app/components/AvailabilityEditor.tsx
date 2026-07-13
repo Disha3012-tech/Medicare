@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Check } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 export interface DaySchedule { enabled: boolean; slots: string[]; }
 export type WeekSchedule = Record<string, DaySchedule>;
@@ -10,8 +10,21 @@ const DEFAULT_SLOTS = ["9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", 
 
 interface Props { schedule: WeekSchedule; onChange: (s: WeekSchedule) => void; }
 
+/** Converts a 24h "HH:MM" (from <input type="time">) into "H:MM AM/PM" to match
+ *  the storage format used everywhere else in the schedule (e.g. "9:00 AM"). */
+function to12Hour(time24: string): string | null {
+  const match = time24.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  let hour = parseInt(match[1], 10);
+  const minute = match[2];
+  const period = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${minute} ${period}`;
+}
+
 export default function AvailabilityEditor({ schedule, onChange }: Props) {
   const [activeDay, setActiveDay] = useState("Monday");
+  const [customTime, setCustomTime] = useState("");
 
   function toggleDay(day: string) {
     onChange({ ...schedule, [day]: { ...schedule[day], enabled: !schedule[day].enabled } });
@@ -26,11 +39,17 @@ export default function AvailabilityEditor({ schedule, onChange }: Props) {
     onChange({ ...schedule, [day]: { ...schedule[day], slots: schedule[day].slots.filter(s => s !== slot) } });
   }
 
+  function addCustomTime() {
+    const formatted = to12Hour(customTime);
+    if (!formatted) return;
+    addSlot(activeDay, formatted);
+    setCustomTime("");
+  }
+
   const day = schedule[activeDay];
 
   return (
     <div className="grid md:grid-cols-[200px_1fr] gap-4">
-      {/* Day selector */}
       <div className="bg-card rounded-xl border border-border p-2 space-y-0.5">
         {DAYS.map(d => (
           <button
@@ -46,7 +65,6 @@ export default function AvailabilityEditor({ schedule, onChange }: Props) {
         ))}
       </div>
 
-      {/* Slot editor */}
       <div className="bg-card rounded-xl border border-border p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-medium text-foreground">{activeDay}</h3>
@@ -80,6 +98,7 @@ export default function AvailabilityEditor({ schedule, onChange }: Props) {
                 </div>
               )}
             </div>
+
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Add slots</p>
               <div className="flex flex-wrap gap-2">
@@ -89,6 +108,26 @@ export default function AvailabilityEditor({ schedule, onChange }: Props) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Add a custom time</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={customTime}
+                  onChange={e => setCustomTime(e.target.value)}
+                  className="bg-input-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <button
+                  onClick={addCustomTime}
+                  disabled={!customTime}
+                  className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">Add any time not covered by the quick-add options above, specific to {activeDay}.</p>
             </div>
           </>
         ) : (
