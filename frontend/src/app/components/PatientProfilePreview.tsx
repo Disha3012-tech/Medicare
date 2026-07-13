@@ -64,7 +64,7 @@ export default function PatientProfilePreview({ patient: p, onClose, onWritePres
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-muted rounded-xl p-3 text-center">
               <p className="font-['Fraunces',serif] text-2xl font-semibold text-foreground">{p.visit_count}</p>
-              <p className="text-xs text-muted-foreground">Total visits</p>
+              <p className="text-xs text-muted-foreground">Total appointments</p>
             </div>
             <div className="bg-muted rounded-xl p-3 text-center">
               <p className="font-['DM_Mono',monospace] text-sm font-medium text-foreground mt-1">{lastVisit || "—"}</p>
