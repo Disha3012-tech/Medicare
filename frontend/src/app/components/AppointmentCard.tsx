@@ -1,7 +1,7 @@
 import { Calendar, Clock, MapPin, Video, ChevronDown, ChevronUp, FileText, Star, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import type { Appointment } from "../services/appointments";
-import AppointmentStatusBadge from "./AppointmentStatusBadge";
+import AppointmentStatusBadge, { type DisplayStatus } from "./AppointmentStatusBadge";
 
 interface Props {
   appt: Appointment;
@@ -19,18 +19,18 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
+const STATUS_MAP: Record<Appointment["status"], DisplayStatus> = {
+  PENDING: "upcoming",
+  CONFIRMED: "upcoming",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+  NO_SHOW: "no_show",
+};
+
 export default function AppointmentCard({ appt, reviewed, onReschedule, onCancel, onViewDetails, onLeaveReview }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isUpcoming = ["PENDING", "CONFIRMED"].includes(appt.status) && new Date(appt.scheduled_at) > new Date();
   const isCompleted = appt.status === "COMPLETED";
-
-  const statusMap: Record<string, "upcoming" | "completed" | "cancelled"> = {
-    PENDING: "upcoming",
-    CONFIRMED: "upcoming",
-    COMPLETED: "completed",
-    CANCELLED: "cancelled",
-    NO_SHOW: "cancelled",
-  };
 
   return (
     <div className="bg-card rounded-xl border border-border hover:shadow-sm transition-all">
@@ -46,7 +46,7 @@ export default function AppointmentCard({ appt, reviewed, onReschedule, onCancel
               </p>
               <p className="text-sm text-accent capitalize">{appt.reason_for_visit || "General visit"}</p>
             </div>
-            <AppointmentStatusBadge status={statusMap[appt.status] || "upcoming"} />
+            <AppointmentStatusBadge status={STATUS_MAP[appt.status]} />
           </div>
           <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatDate(appt.scheduled_at)}</span>
