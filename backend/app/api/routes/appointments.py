@@ -13,6 +13,8 @@ from app.models.models import (
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentOut
 from app.core.deps import get_current_user, require_roles
 from app.ws.manager import manager
+from app.schemas.appointment import EmergencyCancelRequest
+from datetime import datetime, time
 
 router = APIRouter(prefix="/appointments", tags=["appointments"])
 
@@ -23,6 +25,51 @@ def _notify(db: Session, user_id: str, ntype: NotificationType, title: str, body
     db.flush()
     return note
 
+
+@router.post("/emergency-cancel-day", status_code=status.HTTP_200_OK)
+async def emergency_cancel_day(
+    payload: EmergencyCancelRequest,
+    current_user: User = Depends(require_roles(Role.DOCTOR)),
+    db: Session = Depends(get_db),
+):
+    doctor = db.query(Doctor).filter(Doctor.user_id == current_user.id).first()
+    if not doctor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+
+    day_start = datetime.combine(payload.date, time.min)
+    day_end = datetime.combine(payload.date, time.max)
+
+    appts = db.query(Appointment).filter(
+        Appointment.doctor_id == doctor.id,
+        Appointment.status.in_([AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED]),
+        Appointment.scheduled_at >= day_start,
+        Appointment.scheduled_at <= day_end,
+    ).all()
+
+    cancelled_count = 0
+    for appt in appts:
+        appt.status = AppointmentStatus.CANCELLED
+        appt.cancel_reason = f"Emergency cancellation by doctor: {payload.reason}"
+
+        patient = db.query(Patient).filter(Patient.id == appt.patient_id).first()
+        if not patient:
+            continue
+
+        _notify(
+            db, patient.user_id, NotificationType.APPOINTMENT,
+            "Appointment cancelled — emergency",
+            f"Dr. {current_user.last_name} had to cancel all appointments on {payload.date.strftime('%b %d, %Y')} due to an emergency. Please rebook at your convenience.",
+            meta={"appointment_id": appt.id, "doctor_id": doctor.id, "reason": payload.reason, "action": "rebook"},
+        )
+
+        await manager.send_to_user(patient.user_id, {
+            "event": "appointment:updated",
+            "appointmentId": appt.id,
+        })
+        cancelled_count += 1
+
+    db.commit()
+    return {"success": True, "cancelled_count": cancelled_count}
 
 @router.post("", response_model=AppointmentOut, status_code=status.HTTP_201_CREATED)
 async def book_appointment(

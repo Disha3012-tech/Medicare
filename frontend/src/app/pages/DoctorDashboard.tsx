@@ -2,13 +2,15 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import {
   Calendar, Users, ClipboardList, Clock, Video,
-  CheckCircle2, XCircle, Pill, BarChart2, AlertTriangle, Loader2,
+  CheckCircle2, XCircle, Pill, BarChart2, Loader2,
 } from "lucide-react";
 import DoctorShell from "../components/DoctorShell";
 import { useAuth } from "../components/AuthProvider";
 import { appointmentsService, type Appointment } from "../services/appointments";
 import { ToastContainer, useToast } from "../components/ToastNotification";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import EmergencyCancelModal from "../components/EmergencyCancelModal";
+import { AlertTriangle } from "lucide-react"; // add to your existing lucide-react import line
 
 const quickActions = [
   { label: "Write prescription",  icon: Pill,     path: "/doctor/prescriptions" },
@@ -29,6 +31,7 @@ function isPastDue(appt: Appointment) {
   return ["PENDING", "CONFIRMED"].includes(appt.status) && new Date(appt.scheduled_at) < new Date();
 }
 
+
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const { user, doctorProfile } = useAuth();
@@ -42,7 +45,7 @@ export default function DoctorDashboard() {
     if (!user) return;
     loadAppointments();
   }, [user]);
-
+  const [showEmergencyCancel, setShowEmergencyCancel] = useState(false);
   function loadAppointments() {
     setLoading(true);
     appointmentsService.getMine()
@@ -50,7 +53,10 @@ export default function DoctorDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }
-
+  function handleEmergencyCancelled(count: number) {
+    addToast({ type: "info", title: "Appointments cancelled", body: `${count} appointment${count !== 1 ? "s" : ""} cancelled and patients notified.` });
+    loadAppointments();
+  }
   async function markOutcome(id: string, status: "COMPLETED" | "NO_SHOW") {
     setUpdatingId(id);
     try {
@@ -164,7 +170,18 @@ export default function DoctorDashboard() {
               </div>
             </div>
           )}
-
+          <button
+            onClick={() => setShowEmergencyCancel(true)}
+            className="w-full flex items-center justify-center gap-2 bg-destructive/10 text-destructive border border-destructive/20 py-3 rounded-xl text-sm font-medium hover:bg-destructive/20 transition-all"
+          >
+            <AlertTriangle className="w-4 h-4" /> Emergency: Cancel all today's appointments
+          </button>
+          {showEmergencyCancel && (
+            <EmergencyCancelModal
+              onClose={() => setShowEmergencyCancel(false)}
+              onCancelled={handleEmergencyCancelled}
+            />
+          )}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {overviewStats.map(({ label, value, sub, icon: Icon, color }) => (
               <div key={label} className="bg-card rounded-xl border border-border p-4">
@@ -289,6 +306,12 @@ export default function DoctorDashboard() {
             </>
           )}
         </div>
+      )}
+      {showEmergencyCancel && (
+        <EmergencyCancelModal
+          onClose={() => setShowEmergencyCancel(false)}
+          onCancelled={handleEmergencyCancelled}
+        />
       )}
       <ToastContainer toasts={toasts} onDismiss={dismiss} />
     </DoctorShell>
