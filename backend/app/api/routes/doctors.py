@@ -187,10 +187,22 @@ def list_my_patients(
             Appointment.doctor_id == doctor.id, Appointment.patient_id == pid
         ).order_by(Appointment.scheduled_at.desc()).all()
 
-        past_appts = [a for a in appts if a.scheduled_at <= now]
+        past_appts = [
+            a for a in appts
+            if (
+                a.scheduled_at <= now
+                and a.status == AppointmentStatus.COMPLETED
+            )
+        ]
         future_appts = [
             a for a in appts
-            if a.scheduled_at > now and a.status in (AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)
+            if (
+                a.scheduled_at > now
+                and a.status in (
+                    AppointmentStatus.PENDING,
+                    AppointmentStatus.CONFIRMED,
+                )
+            )
         ]
         last_visit = past_appts[0].scheduled_at if past_appts else None
         next_visit = min((a.scheduled_at for a in future_appts), default=None)
