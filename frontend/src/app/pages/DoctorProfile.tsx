@@ -80,7 +80,7 @@ export default function DoctorProfile() {
         </button>
         <div className="flex items-center gap-2 ml-auto">
           <HeartPulse className="w-5 h-5 text-accent" />
-          <span className="font-['Fraunces',serif] font-semibold text-primary hidden sm:block">Medica</span>
+          <span className="font-['Fraunces',serif] font-semibold text-primary hidden sm:block">Medicare</span>
         </div>
       </header>
 
