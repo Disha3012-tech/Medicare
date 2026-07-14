@@ -1,13 +1,16 @@
 import { useNavigate, useLocation } from "react-router";
-import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell, MessageCircle, Star } from "lucide-react";
+import { HeartPulse, Calendar, Users, BarChart2, Clock, Pill, Settings, LogOut, Bell, MessageCircle, Star, History } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import NotificationBell from "./NotificationBell";
 import FloatingAIAssistant from "./FloatingAIAssistant";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 
+
+
 const NAV = [
   { path: "/doctor", label: "Schedule", icon: Calendar, exact: true },
+  { path: "/doctor/history", label: "Appointment ", icon: History },
   { path: "/doctor/patients", label: "Patients", icon: Users },
   { path: "/messages", label: "Messages", icon: MessageCircle },
   { path: "/doctor/prescriptions", label: "Prescriptions", icon: Pill },
