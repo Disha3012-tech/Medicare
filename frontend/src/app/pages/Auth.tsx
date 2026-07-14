@@ -100,7 +100,7 @@ export default function Auth() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(10,147,150,0.4),transparent_65%)] pointer-events-none" />
         <button onClick={() => navigate("/")} className="flex items-center gap-2 text-primary-foreground/80 hover:text-primary-foreground transition-colors w-fit relative">
           <HeartPulse className="w-6 h-6" />
-          <span className="font-['Fraunces',serif] font-semibold text-lg">Medica</span>
+          <span className="font-['Fraunces',serif] font-semibold text-lg">Medicare</span>
         </button>
         <div className="relative">
           <p className="font-['Fraunces',serif] text-4xl font-semibold text-primary-foreground leading-snug mb-4">
@@ -117,7 +117,7 @@ export default function Auth() {
             ))}
           </div>
         </div>
-        <p className="text-primary-foreground/30 text-xs relative">© 2026 Medica Health Inc.</p>
+        <p className="text-primary-foreground/30 text-xs relative">© 2026 Medicare Health Inc.</p>
       </div>
 
       {/* ── Right panel ── */}

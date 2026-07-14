@@ -6,7 +6,7 @@ import { useAuth } from "./AuthProvider";
 interface Message { id: string; role: "user" | "assistant"; text: string; }
 
 const PATIENT_RESPONSES: [RegExp, string, string?][] = [
-  [/\b(hi|hello|hey)\b/i, "Hello! I'm Medi, your Medica AI assistant. I can help you navigate the platform, find doctors, or answer general health questions. What can I do for you?"],
+  [/\b(hi|hello|hey)\b/i, "Hello! I'm Medi, your Medicare AI assistant. I can help you navigate the platform, find doctors, or answer general health questions. What can I do for you?"],
   [/\b(book|appointment|schedule)\b/i, "To book an appointment, go to **Find Doctors** → pick a specialist → choose a date and time. You'll receive instant confirmation. Would you like me to take you there?", "/find-doctors"],
   [/\b(doctor|specialist|find)\b/i, "You can browse and filter verified specialists on the **Find Doctors** page — by specialty, rating, or consultation fee.", "/find-doctors"],
   [/\b(symptom|pain|fever|headache|cough|cold)\b/i, "For a preliminary symptom assessment, try the **Symptom Checker**. It will suggest possible conditions and relevant specialists. Note: it's not a medical diagnosis.", "/symptom-checker"],
@@ -18,12 +18,12 @@ const PATIENT_RESPONSES: [RegExp, string, string?][] = [
   [/\b(message|chat|contact.*doctor)\b/i, "You can message your care team directly in **Messages**.", "/messages"],
   [/\b(video|call|consult|consultation)\b/i, "For a video consultation, book an appointment with a doctor who offers video visits. Once confirmed, you'll find a 'Join call' option when the appointment starts."],
   [/\b(payment|pay|bill|fee|cost)\b/i, "Consultation fees vary by doctor and are shown before you confirm a booking."],
-  [/\b(emergency|urgent|serious)\b/i, "⚠️ If you're experiencing a medical emergency, please call emergency services or go to the nearest emergency room immediately. Medica is for scheduled care only."],
+  [/\b(emergency|urgent|serious)\b/i, "⚠️ If you're experiencing a medical emergency, please call emergency services or go to the nearest emergency room immediately. Medicare is for scheduled care only."],
   [/\b(thank|thanks|great|perfect|helpful)\b/i, "You're welcome! Is there anything else I can help you with?"],
 ];
 
 const DOCTOR_RESPONSES: [RegExp, string, string?][] = [
-  [/\b(hi|hello|hey)\b/i, "Hello Dr.! I'm Medi, your Medica assistant. I can help you navigate your schedule, patients, prescriptions, and practice tools. What do you need?"],
+  [/\b(hi|hello|hey)\b/i, "Hello Dr.! I'm Medi, your Medicare assistant. I can help you navigate your schedule, patients, prescriptions, and practice tools. What do you need?"],
   [/\b(patient|patients)\b/i, "You can view everyone under your care — including their chronic conditions, allergies, and visit history — on the **Patients** page.", "/doctor/patients"],
   [/\b(prescription|medicine|medication|write)\b/i, "Head to **Prescriptions** to view what you've written or create a new one for any of your patients.", "/doctor/prescriptions"],
   [/\b(schedule|appointment|today)\b/i, "Your **Schedule** shows today's appointments, and lets you mark each one as visited or no-show once the time has passed.", "/doctor"],
@@ -36,7 +36,7 @@ const DOCTOR_RESPONSES: [RegExp, string, string?][] = [
   [/\b(thank|thanks|great|perfect|helpful)\b/i, "You're welcome! Let me know if there's anything else."],
 ];
 
-const PATIENT_DEFAULT = "I can help you navigate Medica, book appointments, or answer healthcare questions. Try asking about finding doctors, your appointments, prescriptions, or messages.";
+const PATIENT_DEFAULT = "I can help you navigate Medicare, book appointments, or answer healthcare questions. Try asking about finding doctors, your appointments, prescriptions, or messages.";
 const DOCTOR_DEFAULT = "I can help you navigate your practice tools — try asking about your schedule, patients, prescriptions, availability, or analytics.";
 
 const PATIENT_SUGGESTIONS = ["How do I book an appointment?", "Find a cardiologist", "Check my symptoms", "View my prescriptions", "Message my doctor"];

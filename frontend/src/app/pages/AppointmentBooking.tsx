@@ -211,7 +211,7 @@ useEffect(() => {
         </button>
         <div className="flex items-center gap-2 mx-auto">
           <HeartPulse className="w-5 h-5 text-accent" />
-          <span className="font-['Fraunces',serif] font-semibold text-primary">Medica</span>
+          <span className="font-['Fraunces',serif] font-semibold text-primary">Medicare</span>
         </div>
       </header>
 

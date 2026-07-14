@@ -48,7 +48,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
           <button onClick={() => scrollTo("hero")} className="flex items-center gap-2 flex-shrink-0">
             <HeartPulse className="text-accent w-5 h-5" />
-            <span className="font-['Fraunces',serif] font-semibold text-lg text-primary tracking-tight">Medica</span>
+            <span className="font-['Fraunces',serif] font-semibold text-lg text-primary tracking-tight">Medicare</span>
           </button>
 
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
@@ -185,7 +185,7 @@ export default function Landing() {
       <section id="features" className="py-16 lg:py-20">
         <div className="max-w-6xl mx-auto px-5">
           <div className="text-center mb-12">
-            <p className="text-accent text-xs font-medium tracking-widest uppercase mb-3">Why Medica</p>
+            <p className="text-accent text-xs font-medium tracking-widest uppercase mb-3">Why Medicare</p>
             <h2 className="font-['Fraunces',serif] text-3xl lg:text-4xl font-semibold text-foreground">Built for your wellbeing</h2>
             <p className="text-muted-foreground mt-3 max-w-xl mx-auto text-sm">Everything you need to manage your healthcare — in one secure, intuitive platform.</p>
           </div>
@@ -232,7 +232,7 @@ export default function Landing() {
           <div className="bg-primary rounded-3xl p-10 lg:p-14 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(10,147,150,0.3),transparent_60%)] pointer-events-none" />
             <h2 className="font-['Fraunces',serif] text-3xl lg:text-4xl font-semibold text-primary-foreground mb-3 relative">Ready to take charge of your health?</h2>
-            <p className="text-primary-foreground/70 mb-7 max-w-lg mx-auto text-sm relative">Join 50,000+ patients who book smarter, get seen faster, and stay healthier with Medica.</p>
+            <p className="text-primary-foreground/70 mb-7 max-w-lg mx-auto text-sm relative">Join 50,000+ patients who book smarter, get seen faster, and stay healthier with Medicare.</p>
             <button onClick={() => navigate("/auth?mode=signup")} className="relative inline-flex items-center gap-2 bg-accent text-accent-foreground px-7 py-3.5 rounded-xl font-medium text-sm hover:bg-accent/90 transition-all">
               Create your free account <ArrowRight className="w-4 h-4" />
             </button>
@@ -247,7 +247,7 @@ export default function Landing() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <HeartPulse className="text-accent w-5 h-5" />
-                <span className="font-['Fraunces',serif] font-semibold text-primary">Medica</span>
+                <span className="font-['Fraunces',serif] font-semibold text-primary">Medicare</span>
               </div>
               <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">Connecting patients with verified specialists. Smarter healthcare, built for everyone.</p>
             </div>
@@ -265,7 +265,7 @@ export default function Landing() {
                 <ul className="space-y-2">
                   <li>
                     <a href="mailto:hello@medica.health" className="flex items-center gap-1.5 hover:text-foreground transition-colors">
-                      <Mail className="w-3.5 h-3.5" /> hello@medica.health
+                      <Mail className="w-3.5 h-3.5" /> hello@medicare.health
                     </a>
                   </li>
                   <li>
@@ -278,7 +278,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-            <p>© 2026 Medica Health Inc. All rights reserved.</p>
+            <p>© 2026 Medicare Health Inc. All rights reserved.</p>
             <p>HIPAA Compliant · SOC 2 Type II · ISO 27001</p>
           </div>
         </div>

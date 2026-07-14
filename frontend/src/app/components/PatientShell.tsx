@@ -52,7 +52,7 @@ export default function PatientShell({ title, subtitle, children, actions }: Pro
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <button onClick={() => navigate("/patient")} className="p-6 border-b border-border flex items-center gap-2 hover:bg-muted/30 transition-colors w-full text-left">
           <HeartPulse className="w-6 h-6 text-accent" />
-          <span className="font-['Fraunces',serif] font-semibold text-lg text-primary">Medica</span>
+          <span className="font-['Fraunces',serif] font-semibold text-lg text-primary">Medicare</span>
         </button>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">

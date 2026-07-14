@@ -10,7 +10,7 @@ export default function ErrorPage() {
       <div className="text-center max-w-md">
         <div className="flex items-center justify-center gap-2 mb-10">
           <HeartPulse className="w-6 h-6 text-accent" />
-          <span className="font-['Fraunces',serif] font-semibold text-xl text-primary">Medica</span>
+          <span className="font-['Fraunces',serif] font-semibold text-xl text-primary">Medicare</span>
         </div>
 
         <p className="font-['Fraunces',serif] text-[8rem] font-semibold leading-none text-foreground/10 select-none mb-4">
