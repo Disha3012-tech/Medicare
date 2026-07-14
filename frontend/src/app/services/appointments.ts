@@ -48,6 +48,10 @@ export const appointmentsService = {
     return this.update(id, { status: "CANCELLED", cancel_reason });
   },
 
+  async emergencyCancelDay(date: string, reason: string): Promise<{ success: boolean; cancelled_count: number }> {
+    return api.post("/appointments/emergency-cancel-day", { date, reason });
+  },
+
   async reschedule(id: string, scheduled_at: string): Promise<Appointment> {
     return this.update(id, { scheduled_at });
   }
