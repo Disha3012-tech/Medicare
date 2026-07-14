@@ -18,7 +18,8 @@ import AppointmentStatusBadge, {
 interface Props {
   appt: Appointment;
   reviewed?: boolean;
-  showReviewButton?: boolean; // NEW
+ showReviewButton?: boolean;
+  showAppointmentActions?: boolean; // NEW
   onReschedule?: (id: string) => void;
   onCancel?: (id: string) => void;
   onViewDetails?: (id: string) => void;
@@ -52,6 +53,7 @@ export default function AppointmentCard({
   appt,
   reviewed,
   showReviewButton = true,
+  showAppointmentActions = true,
   onReschedule,
   onCancel,
   onViewDetails,
@@ -125,7 +127,7 @@ export default function AppointmentCard({
               )}
             </button>
 
-            {isUpcoming && (
+            {showAppointmentActions && isUpcoming && (
               <>
                 <button
                   onClick={() => onReschedule?.(appt.id)}

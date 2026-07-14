@@ -106,10 +106,11 @@ export default function DoctorAppointmentHistory() {
           <div className="space-y-3">
             {filtered.map(appt => (
               <AppointmentCard
-                key={appt.id}
-                appt={appt}
-                showReviewButton={false}
-                />
+              key={appt.id}
+              appt={appt}
+              showReviewButton={false}
+              showAppointmentActions={false}
+              />
             ))}
           </div>
         )}
