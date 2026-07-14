@@ -25,6 +25,7 @@ import DoctorProfileSetup from "./pages/DoctorProfileSetup";
 import Messaging from "./pages/Messaging";
 import { RouteGuard } from "./components/RouteGuard";
 import DoctorReviews from "./pages/DoctorReviews";
+import DoctorAppointmentHistory from "./pages/DoctorAppointmentHistory";
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
 
       // Doctor portal — static paths before dynamic :id
       { path: "doctor",                                  element: <RouteGuard allowedRole="DOCTOR"><DoctorDashboard /></RouteGuard> },
+      { path: "doctor/history",                          element: <RouteGuard allowedRole="DOCTOR"><DoctorAppointmentHistory /></RouteGuard> },
       { path: "doctor/patients",                         element: <RouteGuard allowedRole="DOCTOR"><DoctorPatients /></RouteGuard> },
       { path: "doctor/prescriptions",                    element: <RouteGuard allowedRole="DOCTOR"><DoctorPrescription /></RouteGuard> },
       { path: "doctor/analytics",                        element: <RouteGuard allowedRole="DOCTOR"><DoctorAnalytics /></RouteGuard> },
