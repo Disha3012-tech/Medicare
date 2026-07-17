@@ -1,14 +1,15 @@
 from datetime import datetime
+from datetime import date as date_type
 from typing import Optional
 from pydantic import BaseModel
 from app.models.models import AppointmentStatus, AppointmentType
 
-from datetime import date as date_type
 
 class EmergencyCancelRequest(BaseModel):
-    date: date_type  # the day to cancel, e.g. "2026-07-15"
+    date: date_type
     reason: str
-    
+
+
 class AppointmentCreate(BaseModel):
     doctor_id: str
     scheduled_at: datetime
@@ -38,3 +39,14 @@ class AppointmentOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CallInfoOut(BaseModel):
+    """Everything the video consultation page needs to join a call."""
+    room_id: str
+    appointment_id: str
+    scheduled_at: datetime
+    other_participant_name: str
+    other_participant_avatar: Optional[str] = None
+    other_participant_role: str  # "doctor" | "patient"
+    specialty: Optional[str] = None

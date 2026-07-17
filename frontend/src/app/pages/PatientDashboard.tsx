@@ -15,6 +15,7 @@ import {
 } from "../services/appointments";
 
 import { Skeleton } from "../components/LoadingSkeleton";
+import UpcomingVideoCallBanner from "../components/UpcomingVideoCallBanner";
 
 const specialties = [
   "Cardiology",
@@ -184,6 +185,8 @@ export default function PatientDashboard() {
             </div>
           )}
 
+          <UpcomingVideoCallBanner appointments={appointments} />
+            
           {/* Upcoming list */}
           <div>
             <h2 className="font-medium text-sm mb-3">
