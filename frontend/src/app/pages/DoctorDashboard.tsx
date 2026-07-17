@@ -11,6 +11,7 @@ import { ToastContainer, useToast } from "../components/ToastNotification";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import EmergencyCancelModal from "../components/EmergencyCancelModal";
 import { AlertTriangle } from "lucide-react"; // add to your existing lucide-react import line
+import UpcomingVideoCallBanner from "../components/UpcomingVideoCallBanner";
 
 const quickActions = [
   { label: "Write prescription",  icon: Pill,     path: "/doctor/prescriptions" },
@@ -182,6 +183,7 @@ export default function DoctorDashboard() {
               onCancelled={handleEmergencyCancelled}
             />
           )}
+          <UpcomingVideoCallBanner appointments={appointments} />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {overviewStats.map(({ label, value, sub, icon: Icon, color }) => (
               <div key={label} className="bg-card rounded-xl border border-border p-4">

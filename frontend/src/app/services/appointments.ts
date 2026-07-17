@@ -11,9 +11,18 @@ export interface Appointment {
   reason_for_visit?: string;
   notes?: string;
   cancel_reason?: string;
-  // Related loaded objects (if included in DB serializer, though our schemas are flat, we will merge names on the frontend if needed)
   doctor_name?: string;
   patient_name?: string;
+}
+
+export interface CallInfo {
+  room_id: string;
+  appointment_id: string;
+  scheduled_at: string;
+  other_participant_name: string;
+  other_participant_avatar?: string;
+  other_participant_role: "doctor" | "patient";
+  specialty?: string;
 }
 
 export const appointmentsService = {
@@ -35,6 +44,10 @@ export const appointmentsService = {
     return api.get(`/appointments/${id}`);
   },
 
+  async getCallInfo(id: string): Promise<CallInfo> {
+    return api.get(`/appointments/${id}/call-info`);
+  },
+
   async update(id: string, payload: {
     status?: string;
     scheduled_at?: string;
@@ -48,11 +61,15 @@ export const appointmentsService = {
     return this.update(id, { status: "CANCELLED", cancel_reason });
   },
 
+  async reschedule(id: string, scheduled_at: string): Promise<Appointment> {
+    return this.update(id, { scheduled_at });
+  },
+
+  async startCall(id: string): Promise<{ success: boolean }> {
+    return api.post(`/appointments/${id}/start-call`, {});
+  },
+
   async emergencyCancelDay(date: string, reason: string): Promise<{ success: boolean; cancelled_count: number }> {
     return api.post("/appointments/emergency-cancel-day", { date, reason });
   },
-
-  async reschedule(id: string, scheduled_at: string): Promise<Appointment> {
-    return this.update(id, { scheduled_at });
-  }
 };

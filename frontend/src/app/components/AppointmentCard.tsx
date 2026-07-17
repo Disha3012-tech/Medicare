@@ -10,6 +10,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
+import { Video as VideoIcon } from "lucide-react"; // if Video icon name collides, alias like this
 import type { Appointment } from "../services/appointments";
 import AppointmentStatusBadge, {
   type DisplayStatus,
@@ -60,7 +62,7 @@ export default function AppointmentCard({
   onLeaveReview,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
-
+  const navigate = useNavigate();
   const isUpcoming =
     ["PENDING", "CONFIRMED"].includes(appt.status) &&
     new Date(appt.scheduled_at) > new Date();
@@ -127,7 +129,7 @@ export default function AppointmentCard({
               )}
             </button>
 
-            {showAppointmentActions && isUpcoming && (
+            {showAppointmentActions && isUpcoming && appt.type === "VIDEO" && (
               <>
                 <button
                   onClick={() => onReschedule?.(appt.id)}
@@ -142,6 +144,13 @@ export default function AppointmentCard({
                 >
                   Cancel
                 </button>
+                <button
+                  onClick={() => navigate(`/consultation/${appt.id}`)}
+                  className="text-xs text-white bg-primary rounded-lg px-3 py-1.5 hover:bg-primary/90 transition-colors flex items-center gap-1"
+                >
+                  <VideoIcon className="w-3.5 h-3.5" /> Join call
+                </button>
+            
               </>
             )}
 
