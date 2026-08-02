@@ -1,20 +1,30 @@
 import json
-import httpx
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from google import genai
 
 from app.core.config import settings
 from app.core.deps import get_current_user
 from app.models.models import User
 from app.schemas.symptom import SymptomCheckRequest, SymptomCheckResponse
 
-router = APIRouter(prefix="/symptom-check", tags=["symptom-checker"])
+
+router = APIRouter(
+    prefix="/symptom-check",
+    tags=["symptom-checker"],
+)
+
 
 SYSTEM_PROMPT = """
-You are a medical triage assistant.
+You are a medical triage assistant for a healthcare application.
+
+You are NOT a doctor and must not claim to provide a medical diagnosis.
+
+Analyze the symptoms provided by the user and provide a cautious triage-oriented response.
 
 Return ONLY valid JSON.
 
-Schema:
+The JSON must exactly follow this schema:
 
 {
   "conditions": [
@@ -34,37 +44,58 @@ Schema:
 Rules:
 
 - Output ONLY JSON.
-- No markdown.
-- No ```json.
-- No explanation.
-- Do not omit quotes.
+- Do NOT use markdown.
+- Do NOT use ```json.
+- Do NOT include explanations outside the JSON.
+- Do NOT omit quotation marks.
 - Produce syntactically valid JSON.
+- probability MUST be one of: High, Moderate, Low.
+- urgency MUST be one of: routine, soon, urgent.
+- emergency MUST be true or false.
+- If symptoms could indicate a medical emergency, set emergency to true
+  and use urgency "urgent".
+- Do not claim certainty or provide a definitive diagnosis.
+- Recommend appropriate medical specialists based on the symptoms.
 """
 
-API_URL = "https://api.featherless.ai/v1/chat/completions"
 
-
-async def ask_model(messages):
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        return await client.post(
-            API_URL,
-            headers={
-                "Authorization": f"Bearer {settings.featherless_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": settings.featherless_model,
-                "messages": messages,
-                "temperature": 0,
-                "max_tokens": 500,
-                "response_format": {
-                    "type": "json_object"
-                },
-            },
+def get_gemini_client():
+    if not settings.gemini_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini API key not configured",
         )
 
+    return genai.Client(
+        api_key=settings.gemini_api_key
+    )
 
-@router.post("", response_model=SymptomCheckResponse)
+
+async def ask_model(symptoms: list[str]):
+    client = get_gemini_client()
+
+    prompt = (
+        SYSTEM_PROMPT
+        + "\n\nSymptoms reported by the user:\n"
+        + ", ".join(symptoms)
+    )
+
+    response = client.models.generate_content(
+        model=settings.gemini_model,
+        contents=prompt,
+        config={
+            "temperature": 0,
+            "response_mime_type": "application/json",
+        },
+    )
+
+    return response.text
+
+
+@router.post(
+    "",
+    response_model=SymptomCheckResponse,
+)
 async def check_symptoms(
     payload: SymptomCheckRequest,
     current_user: User = Depends(get_current_user),
@@ -75,47 +106,38 @@ async def check_symptoms(
             detail="At least one symptom is required",
         )
 
-    if not settings.featherless_api_key:
+    if not settings.gemini_api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Featherless API key not configured",
+            detail="Gemini API key not configured",
         )
 
     print("\n" + "=" * 80)
-    print("MODEL LOADED:", settings.featherless_model)
-    print("API KEY EXISTS:", bool(settings.featherless_api_key))
+    print("GEMINI MODEL:", settings.gemini_model)
+    print("API KEY EXISTS:", bool(settings.gemini_api_key))
     print("=" * 80)
 
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT,
-        },
-        {
-            "role": "user",
-            "content": "Symptoms: " + ", ".join(payload.symptoms),
-        },
-    ]
-
     try:
-
-        response = await ask_model(messages)
+        content = await ask_model(payload.symptoms)
 
         print("\n" + "=" * 80)
-        print("Featherless Status Code:", response.status_code)
-        print("Featherless Response:")
-        print(response.text)
+        print("Gemini Response:")
+        print(content)
         print("=" * 80 + "\n")
 
-        response.raise_for_status()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Gemini returned an empty response.",
+            )
 
-        data = response.json()
+        content = content.strip()
 
-        content = data["choices"][0]["message"]["content"].strip()
-
+        # Safety cleanup in case Gemini still returns markdown fences
         if content.startswith("```"):
             content = content.replace("```json", "")
-            content = content.replace("```", "").strip()
+            content = content.replace("```", "")
+            content = content.strip()
 
         try:
             parsed = json.loads(content)
@@ -124,53 +146,39 @@ async def check_symptoms(
 
             print("\nINVALID JSON. RETRYING...\n")
 
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": content,
-                }
+            retry_prompt = (
+                SYSTEM_PROMPT
+                + "\n\nSymptoms reported by the user:\n"
+                + ", ".join(payload.symptoms)
+                + "\n\nYour previous response was invalid JSON."
+                + "\nReturn ONLY valid JSON matching the required schema."
+                + "\nDo not include markdown."
             )
 
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Your previous response was invalid JSON. "
-                        "Return ONLY valid JSON matching the schema. "
-                        "Do not omit quotes. "
-                        "Do not include markdown."
-                    ),
-                }
+            client = get_gemini_client()
+
+            retry = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=retry_prompt,
+                config={
+                    "temperature": 0,
+                    "response_mime_type": "application/json",
+                },
             )
 
-            retry = await ask_model(messages)
+            retry_content = retry.text.strip()
+
+            if retry_content.startswith("```"):
+                retry_content = retry_content.replace("```json", "")
+                retry_content = retry_content.replace("```", "")
+                retry_content = retry_content.strip()
 
             print("\nRETRY RESPONSE:\n")
-            print(retry.text)
+            print(retry_content)
 
-            retry.raise_for_status()
-
-            retry_json = retry.json()
-
-            content = retry_json["choices"][0]["message"]["content"].strip()
-
-            if content.startswith("```"):
-                content = content.replace("```json", "")
-                content = content.replace("```", "").strip()
-
-            parsed = json.loads(content)
+            parsed = json.loads(retry_content)
 
         return SymptomCheckResponse(**parsed)
-
-    except httpx.HTTPStatusError as e:
-
-        print("\nHTTP ERROR")
-        print(e.response.text)
-
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=e.response.text,
-        )
 
     except json.JSONDecodeError:
 
@@ -179,23 +187,16 @@ async def check_symptoms(
             detail="AI returned invalid JSON twice.",
         )
 
-    except httpx.RequestError as e:
-
-        print("\nREQUEST ERROR")
-        print(e)
-
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unable to reach Featherless API.",
-        )
+    except HTTPException:
+        raise
 
     except Exception as e:
 
-        print("\nUNKNOWN ERROR")
+        print("\nGEMINI ERROR")
         print(type(e).__name__)
         print(e)
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Unable to process symptom check: {str(e)}",
         )
