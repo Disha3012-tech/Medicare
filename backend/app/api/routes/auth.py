@@ -49,10 +49,12 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if payload.role == Role.PATIENT:
         db.add(Patient(user_id=user.id))
     elif payload.role == Role.DOCTOR:
+        if not payload.license_number or not payload.license_number.strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Doctor's license number is mandatory for registration")
         db.add(Doctor(
             user_id=user.id,
             specialty="General Physician",
-            license_number=f"PENDING-{user.id[:8]}",
+            license_number=payload.license_number.strip(),
             consultation_fee=0,
         ))
 

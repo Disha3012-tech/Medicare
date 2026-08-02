@@ -26,6 +26,8 @@ import Messaging from "./pages/Messaging";
 import { RouteGuard } from "./components/RouteGuard";
 import DoctorReviews from "./pages/DoctorReviews";
 import DoctorAppointmentHistory from "./pages/DoctorAppointmentHistory";
+import AdminDashboard from "./pages/AdminDashboard";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -33,6 +35,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true,                                     Component: Landing },
       { path: "auth",                                    Component: Auth },
+      { path: "admin",                                   element: <RouteGuard allowedRole="ADMIN"><AdminDashboard /></RouteGuard> },
 
       // Onboarding
       { path: "patient/setup",                           element: <RouteGuard allowedRole="PATIENT"><PatientProfileSetup /></RouteGuard> },
@@ -57,6 +60,7 @@ export const router = createBrowserRouter([
       { path: "doctor/notifications",                    element: <RouteGuard allowedRole="DOCTOR"><Notifications /></RouteGuard> },
       { path: "doctor/reviews",                          element: <RouteGuard allowedRole="DOCTOR"><DoctorReviews /></RouteGuard> },
       { path: "doctor/:id",                              element: <RouteGuard><DoctorProfile /></RouteGuard> },
+
       // Discovery & booking
       { path: "find-doctors",                            element: <RouteGuard allowedRole="PATIENT"><FindDoctors /></RouteGuard> },
       { path: "book/:id",                                element: <RouteGuard allowedRole="PATIENT"><AppointmentBooking /></RouteGuard> },

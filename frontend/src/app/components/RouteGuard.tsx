@@ -22,6 +22,8 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children, allowedRole })
           navigate("/patient");
         } else if (user.role === "DOCTOR") {
           navigate("/doctor");
+        } else if (user.role === "ADMIN") {
+          navigate("/admin");
         }
       }
     }
