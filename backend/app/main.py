@@ -21,7 +21,10 @@ app = FastAPI(title="Medicare API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.client_url],
+    allow_origins=[
+        settings.client_url,
+        "https://medicare-bx4lvw68m-disha3012-techs-projects.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
