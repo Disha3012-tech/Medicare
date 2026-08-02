@@ -25,7 +25,7 @@ const STEP_LABELS: Record<Step, string> = {
 
 interface FormState {
   fullName: string; countryCode: string; phone: string; gender: "Male" | "Female" | "";
-  specialty: string; customSpecialty: string; experience: string;
+  specialty: string; customSpecialty: string; licenseNumber: string; experience: string;
   qualifications: string[]; hospital: string;
   clinicAddress: string; city: string; state: string;
   consultationFee: string;
@@ -35,7 +35,7 @@ interface FormState {
 
 const INITIAL: FormState = {
   fullName: "", countryCode: "+91", phone: "", gender: "",
-  specialty: "", customSpecialty: "", experience: "",
+  specialty: "", customSpecialty: "", licenseNumber: "", experience: "",
   qualifications: [], hospital: "",
   clinicAddress: "", city: "", state: "",
   consultationFee: "",
@@ -81,6 +81,7 @@ export default function DoctorProfileSetup() {
         fullName: `${d.first_name} ${d.last_name}`.trim() || f.fullName,
         specialty: selected || f.specialty,
         customSpecialty: customText,
+        licenseNumber: d.license_number || f.licenseNumber,
         experience: d.years_experience ? String(d.years_experience) : f.experience,
         hospital: d.clinic_name || f.hospital,
         clinicAddress: d.clinic_address || f.clinicAddress,
@@ -110,7 +111,7 @@ export default function DoctorProfileSetup() {
   function canProceed(): boolean {
     if (step === 1) return !!form.fullName && !!form.gender && !!form.phone;
     if (step === 2) {
-      if (!form.specialty || !form.experience) return false;
+      if (!form.specialty || !form.experience || !form.licenseNumber.trim()) return false;
       if (form.specialty === OTHERS_VALUE && !form.customSpecialty.trim()) return false;
       return true;
     }
@@ -136,6 +137,7 @@ export default function DoctorProfileSetup() {
 
       await doctorsService.updateMe({
         specialty: resolveSpecialtyForSubmit(form.specialty, form.customSpecialty),
+        license_number: form.licenseNumber.trim(),
         years_experience: Number(form.experience) || 0,
         bio: form.bio || undefined,
         consultation_fee: Number(form.consultationFee) || 0,
@@ -230,6 +232,17 @@ export default function DoctorProfileSetup() {
 
           {step === 2 && (
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Medical License Number *</label>
+                <input
+                  type="text"
+                  value={form.licenseNumber}
+                  onChange={e => set("licenseNumber", e.target.value)}
+                  placeholder="e.g. MED-123456"
+                  className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  required
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Medical specialty *</label>
                 <div className="grid grid-cols-2 gap-2">

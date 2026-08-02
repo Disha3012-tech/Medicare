@@ -11,6 +11,8 @@ class RegisterRequest(BaseModel):
     last_name: str
     role: Role
     phone: Optional[str] = None
+    license_number: Optional[str] = None
+
 
 
 class LoginRequest(BaseModel):

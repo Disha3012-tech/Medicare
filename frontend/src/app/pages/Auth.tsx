@@ -13,7 +13,7 @@ export default function Auth() {
   const [mode, setMode] = useState<Mode>((params.get("mode") as Mode) || "login");
   const [role, setRole] = useState<Role>((params.get("role") as Role) || "patient");
   const [showPass, setShowPass] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "", customSpecialty: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", specialty: "", customSpecialty: "", licenseNumber: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -35,6 +35,7 @@ export default function Auth() {
     setError("");
     if (!form.email || !form.password) { setError("Please fill in all required fields."); return; }
     if (mode === "signup" && !form.name) { setError("Please enter your name."); return; }
+    if (mode === "signup" && role === "doctor" && !form.licenseNumber.trim()) { setError("Doctor's license number is mandatory."); return; }
     if (mode === "signup" && !pwValid) { setError("Password must be at least 8 characters."); return; }
     if (mode === "signup" && !agreedToTerms) { setError("Please agree to the Terms & Conditions to continue."); return; }
     if (mode === "signup" && role === "doctor" && form.specialty === OTHERS_VALUE && !form.customSpecialty.trim()) {
@@ -54,15 +55,16 @@ export default function Auth() {
           first_name,
           last_name,
           role: role.toUpperCase(),
+          license_number: role === "doctor" ? form.licenseNumber.trim() : undefined,
         });
 
         const finalSpecialty = resolveSpecialtyForSubmit(form.specialty, form.customSpecialty);
         if (role === "doctor" && finalSpecialty) {
           const { doctorsService } = await import("../services/doctors");
           try {
-            await doctorsService.updateMe({ specialty: finalSpecialty });
+            await doctorsService.updateMe({ specialty: finalSpecialty, license_number: form.licenseNumber.trim() });
           } catch (err) {
-            console.error("Failed to update specialty after signup:", err);
+            console.error("Failed to update doctor profile after signup:", err);
           }
         }
 
@@ -187,29 +189,45 @@ export default function Auth() {
             )}
 
             {mode === "signup" && role === "doctor" && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Specialty</label>
-                <select
-                  value={form.specialty}
-                  onChange={e => setForm(f => ({ ...f, specialty: e.target.value, customSpecialty: e.target.value === OTHERS_VALUE ? f.customSpecialty : "" }))}
-                  className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                >
-                  <option value="">Select your specialty</option>
-                  {SPECIALTIES.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                  <option value={OTHERS_VALUE}>Others</option>
-                </select>
-                {form.specialty === OTHERS_VALUE && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Medical License Number <span className="text-destructive">*</span>
+                  </label>
                   <input
                     type="text"
-                    placeholder="Enter your specialty"
-                    value={form.customSpecialty}
-                    onChange={e => setForm(f => ({ ...f, customSpecialty: e.target.value }))}
-                    className="w-full mt-2 bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                    placeholder="e.g. MED-123456"
+                    value={form.licenseNumber}
+                    onChange={e => setForm(f => ({ ...f, licenseNumber: e.target.value }))}
+                    className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                    required
                   />
-                )}
-              </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Specialty</label>
+                  <select
+                    value={form.specialty}
+                    onChange={e => setForm(f => ({ ...f, specialty: e.target.value, customSpecialty: e.target.value === OTHERS_VALUE ? f.customSpecialty : "" }))}
+                    className="w-full bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                  >
+                    <option value="">Select your specialty</option>
+                    {SPECIALTIES.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                    <option value={OTHERS_VALUE}>Others</option>
+                  </select>
+                  {form.specialty === OTHERS_VALUE && (
+                    <input
+                      type="text"
+                      placeholder="Enter your specialty"
+                      value={form.customSpecialty}
+                      onChange={e => setForm(f => ({ ...f, customSpecialty: e.target.value }))}
+                      className="w-full mt-2 bg-input-background border border-border rounded-lg px-4 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                    />
+                  )}
+                </div>
+              </>
             )}
 
             <div>
@@ -259,8 +277,8 @@ export default function Auth() {
                       background: pwValid
                         ? "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.10))"
                         : pwLen < 5
-                        ? "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(220,38,38,0.08))"
-                        : "linear-gradient(135deg,rgba(245,158,11,0.14),rgba(217,119,6,0.09))",
+                          ? "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(220,38,38,0.08))"
+                          : "linear-gradient(135deg,rgba(245,158,11,0.14),rgba(217,119,6,0.09))",
                       border: `1.5px solid ${pwValid ? "rgba(16,185,129,0.45)" : pwLen < 5 ? "rgba(239,68,68,0.40)" : "rgba(245,158,11,0.40)"}`,
                       transition: "all 0.3s ease",
                     }}
@@ -388,7 +406,7 @@ export default function Auth() {
 
             <button
               type="submit"
-              disabled={loading || (mode === "signup" && (!pwValid || !agreedToTerms))}
+              disabled={loading || (mode === "signup" && (!pwValid || !agreedToTerms || (role === "doctor" && !form.licenseNumber.trim())))}
               className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium text-sm hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed mt-1"
             >
               {loading
