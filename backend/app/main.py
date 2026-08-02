@@ -61,6 +61,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"success": False, "message": "Internal server error"})
 
+@app.get("/")
+def root():
+    return {
+        "message": "Medicare API is running!🎉"
+    }
+
 
 @app.get("/health")
 def health_check():
