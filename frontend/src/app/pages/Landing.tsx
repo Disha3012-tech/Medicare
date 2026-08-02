@@ -270,7 +270,7 @@ export default function Landing() {
                   </li>
                   <li>
                     <a href="tel:+18005550100" className="flex items-center gap-1.5 hover:text-foreground transition-colors">
-                      <Phone className="w-3.5 h-3.5" /> +1 (800) 555-0100
+                      <Phone className="w-3.5 h-3.5" /> +91 8383811914
                     </a>
                   </li>
                 </ul>

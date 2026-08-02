@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
-import { Send, X, Users, MessageSquare, HeartPulse, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
+import { Send, X, Users, MessageSquare, HeartPulse, CalendarCheck2, AlertTriangle, Loader2, Volume2 } from "lucide-react";
 import { appointmentsService, type CallInfo } from "../services/appointments";
 import { chatService } from "../services/chat";
 import { useAuth } from "../components/AuthProvider";
@@ -41,6 +41,7 @@ export default function VideoConsultation() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [remoteMuted, setRemoteMuted] = useState(false);
   const [remoteCameraOff, setRemoteCameraOff] = useState(false);
+  const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false);
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
@@ -54,10 +55,12 @@ export default function VideoConsultation() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const hasOfferedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const presenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isOfferer = callInfo?.other_participant_role === "doctor"; // patient always offers
 
@@ -82,7 +85,7 @@ export default function VideoConsultation() {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         localStreamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        bindLocalVideo();
 
         setupPeerConnection(stream);
         connectSignaling();
@@ -100,17 +103,30 @@ export default function VideoConsultation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callInfo]);
 
-  // 3. Keep the video stream correctly attached to the single always-mounted element across status changes
+  // Re-bind local/remote streams whenever the video elements exist and status changes.
+  // This is the fix: <video> elements are now ALWAYS mounted (never conditionally
+  // unmounted/remounted based on status), so this effect just ensures whichever
+  // stream arrived gets attached even if the element wasn't ready the first time.
   useEffect(() => {
-    if (localVideoRef.current && localStreamRef.current && (status === "waiting-peer" || status === "connected")) {
-      // Re-evaluate stream mapping when status toggles to ensure visual synchronization
-      if (isScreenSharing && screenStreamRef.current) {
-        localVideoRef.current.srcObject = screenStreamRef.current;
-      } else {
-        localVideoRef.current.srcObject = localStreamRef.current;
+    bindLocalVideo();
+    bindRemoteVideo();
+  }, [status]);
+
+  function bindLocalVideo() {
+    if (localVideoRef.current && localStreamRef.current && localVideoRef.current.srcObject !== localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }
+
+  function bindRemoteVideo() {
+    if (remoteVideoRef.current && remoteStreamRef.current && remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      const playPromise = remoteVideoRef.current.play();
+      if (playPromise) {
+        playPromise.catch(() => setNeedsAudioUnlock(true));
       }
     }
-  }, [status, isScreenSharing]);
+  }
 
   // Call timer
   useEffect(() => {
@@ -132,8 +148,10 @@ export default function VideoConsultation() {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+      remoteStreamRef.current = event.streams[0];
       setStatus("connected");
+      // also try binding immediately in case the element is already mounted
+      bindRemoteVideo();
     };
 
     pc.onicecandidate = (event) => {
@@ -154,12 +172,30 @@ export default function VideoConsultation() {
     if (!callInfo) return;
     const ws = chatService.connectVideo(callInfo.room_id, handleSignal);
     if (!ws) { setStatus("error"); setErrorMessage("Couldn't connect to the call server."); return; }
-    ws.onopen = () => sendSignal({ type: "join" });
+    ws.onopen = () => {
+      wsRef.current = ws;
+      announcePresence();
+    };
     wsRef.current = ws;
   }
 
+  // Keep announcing presence every 1.5s until connected, so a message lost to a
+  // startup race (the other side's peer connection wasn't ready yet) gets retried
+  // instead of silently stalling the whole call forever.
+  function announcePresence() {
+    sendSignal({ type: "join" });
+    const interval = setInterval(() => {
+      if (status === "connected" || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        clearInterval(interval);
+        return;
+      }
+      sendSignal({ type: "join" });
+    }, 1500);
+    presenceIntervalRef.current = interval;
+  }
+
   function sendSignal(data: any) {
-    wsRef.current?.readyState === WebSocket.OPEN && wsRef.current.send(JSON.stringify(data));
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(data));
   }
 
   async function maybeCreateOffer() {
@@ -173,7 +209,7 @@ export default function VideoConsultation() {
 
   async function handleSignal(data: any) {
     const pc = pcRef.current;
-    if (!pc) return;
+    if (!pc) return; // not ready yet — the sender's retry loop will re-announce
 
     switch (data.type) {
       case "join":
@@ -184,6 +220,7 @@ export default function VideoConsultation() {
         maybeCreateOffer();
         break;
       case "offer": {
+        if (presenceIntervalRef.current) { clearInterval(presenceIntervalRef.current); presenceIntervalRef.current = null; }
         await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         await flushPendingCandidates();
         const answer = await pc.createAnswer();
@@ -192,6 +229,7 @@ export default function VideoConsultation() {
         break;
       }
       case "answer":
+        if (presenceIntervalRef.current) { clearInterval(presenceIntervalRef.current); presenceIntervalRef.current = null; }
         await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         await flushPendingCandidates();
         break;
@@ -289,12 +327,27 @@ export default function VideoConsultation() {
     wsRef.current?.close();
     wsRef.current = null;
     if (timerRef.current) clearInterval(timerRef.current);
+    if (presenceIntervalRef.current) clearInterval(presenceIntervalRef.current);
   }
 
-  function endCall() {
+  async function endCall() {
     sendSignal({ type: "hangup" });
     cleanup();
     setStatus("ended");
+
+    // Only the doctor ending the call marks the appointment complete —
+    // a patient leaving early shouldn't finalize the visit on its own.
+    if (user?.role === "DOCTOR" && callInfo) {
+      try {
+        await appointmentsService.update(callInfo.appointment_id, { status: "COMPLETED" });
+      } catch {
+        // Non-fatal — the doctor can still mark it manually from the dashboard later
+      }
+    }
+  }
+
+  function unlockAudio() {
+    remoteVideoRef.current?.play().then(() => setNeedsAudioUnlock(false)).catch(() => {});
   }
 
   // ── Loading / error states ──
@@ -371,9 +424,6 @@ export default function VideoConsultation() {
             >
               {isDoctor ? "Back to appointments" : "View my appointments"}
             </button>
-            {!isDoctor && (
-              <button onClick={() => navigate(`/book/${callInfo.other_participant_role === "doctor" ? "" : ""}`)} className="hidden" />
-            )}
             <button onClick={() => navigate(isDoctor ? "/doctor" : "/patient")} className="w-full border border-border rounded-xl py-3 text-sm text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">
               Back to dashboard
             </button>
@@ -394,8 +444,15 @@ export default function VideoConsultation() {
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 relative min-w-0">
-          {status === "waiting-peer" && (
-            <div className="absolute inset-0 flex items-center justify-center">
+          {/* Remote video — ALWAYS mounted so pc.ontrack's stream can bind whenever it arrives */}
+          <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className={`w-full h-full object-cover ${status === "connected" && !remoteCameraOff ? "block" : "hidden"}`}
+            />
+            {status === "waiting-peer" && (
               <div className="text-center">
                 <div className="relative mx-auto mb-6 w-28 h-28">
                   <div className="w-28 h-28 rounded-full overflow-hidden ring-4 ring-white/10">
@@ -414,26 +471,41 @@ export default function VideoConsultation() {
                   Waiting for {otherName} to join
                 </div>
               </div>
-            </div>
+            )}
+            {status === "connected" && remoteCameraOff && (
+              <div className="w-24 h-24 rounded-full bg-zinc-700 flex items-center justify-center text-3xl font-semibold text-white/60">
+                {otherName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+              </div>
+            )}
+            {status === "connected" && (
+              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5">
+                {remoteMuted && <span className="text-red-400 text-xs">●</span>}
+                <span className="text-white text-sm">{otherName}</span>
+              </div>
+            )}
+          </div>
+
+          {needsAudioUnlock && (
+            <button
+              onClick={unlockAudio}
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-accent text-white text-sm px-4 py-2 rounded-xl shadow-lg hover:bg-accent/90 transition-all"
+            >
+              <Volume2 className="w-4 h-4" /> Tap to enable sound
+            </button>
           )}
 
-          {status === "connected" && (
-            <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
-              {!remoteCameraOff ? (
-                <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-zinc-700 flex items-center justify-center text-3xl font-semibold text-white/60">
-                  {otherName.split(" ").map(n => n[0]).join("").slice(0, 2)}
+          {isScreenSharing && (
+            <div className="absolute inset-0 bg-zinc-950/90 flex items-center justify-center z-10 pointer-events-none">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-3">
+                  <HeartPulse className="w-8 h-8 text-accent" />
                 </div>
-              )}
-              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5">
-                {remoteMuted && <span className="text-red-400 textxs">●</span>}
-                <span className="text-white text-sm">{otherName}</span>
+                <p className="text-white font-medium mb-1">You are sharing your screen</p>
               </div>
             </div>
           )}
 
-          {/* Always-mounted Local Picture-in-Picture View Container */}
+          {/* Local PiP — ALWAYS mounted, repositioned/resized via CSS depending on status */}
           <div className={`absolute z-20 rounded-xl overflow-hidden bg-zinc-800 ring-2 ring-white/10 shadow-xl transition-all ${status === "waiting-peer" ? "bottom-6 right-6 w-48 aspect-video" : "top-4 right-4 w-36 aspect-video"}`}>
             <video
               ref={localVideoRef}
