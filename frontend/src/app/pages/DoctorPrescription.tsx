@@ -88,7 +88,7 @@ export default function DoctorPrescription() {
         ) : (
           <div className="space-y-3">
             {filtered.map(px => (
-              <PrescriptionCard key={px.id} prescription={px} showPatient />
+              <PrescriptionCard key={px.id} prescription={px} showPatient showDownload={false} />
             ))}
           </div>
         )}
