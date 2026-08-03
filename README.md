@@ -4,6 +4,14 @@ The **Medicare Telehealth Platform** is a modern, high-performance, full-stack d
 
 ---
 
+## 🌐 Live Demo
+
+**Frontend:** https://medicare-86rw3rk2f-disha3012-techs-projects.vercel.app/
+
+**Backend API:** https://medicare-yyug.onrender.com/
+
+---
+
 ## 🌟 Core Features & Modules
 
 The platform is structured into key, interlocking modules that manage the entire patient-doctor lifecycle:
